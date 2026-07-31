@@ -1,14 +1,26 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "./features/dashboard/Dashboard";
+import type { ReactNode } from "react";
 
-function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-      </Routes>
-    </BrowserRouter>
-  );
+import Header from "./Header";
+import Sidebar from "./Sidebar";
+
+interface AppLayoutProps {
+  children: ReactNode;
 }
 
-export default App;
+export default function AppLayout({ children }: AppLayoutProps) {
+  return (
+    <div className="min-h-screen bg-slate-50">
+
+      <Sidebar />
+
+      <Header />
+
+      <main className="ml-72 pt-[72px]">
+        <div className="min-h-[calc(100vh-72px)] p-8">
+          {children}
+        </div>
+      </main>
+
+    </div>
+  );
+}
