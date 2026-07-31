@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+
 function App() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-100">
@@ -9,6 +11,7 @@ function App() {
         <p className="mt-4 text-slate-600">
           Tailwind CSS is working 🎉
         </p>
+        <Button className="mt-6">Create appointment</Button>
       </div>
     </div>
   );
