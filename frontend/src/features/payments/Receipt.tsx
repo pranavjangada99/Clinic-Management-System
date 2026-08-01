@@ -1,4 +1,9 @@
 import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
   useNavigate,
   useParams,
 } from "react-router-dom";
@@ -12,7 +17,29 @@ import {
 
 import AppButton from "@/components/ui/app/AppButton";
 
-import { payments } from "./data/payments";
+interface Payment {
+  id: number;
+
+  billId: number;
+  billNumber: string;
+
+  patientId: number;
+  patientName: string;
+  patientUhid: string;
+
+  amount: number;
+
+  method: string;
+
+  reference: string | null;
+  notes: string | null;
+
+  paymentDate: string;
+  createdAt: string;
+}
+
+const API_URL =
+  "http://localhost:5230/api/payments";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -22,17 +49,113 @@ export default function Receipt() {
 
   const { paymentId } = useParams();
 
-  const payment = payments.find(
-    (item) =>
-      item.id === Number(paymentId)
-  );
+  const [payment, setPayment] =
+    useState<Payment | null>(null);
 
-  if (!payment) {
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  /*
+   * Load payment from database
+   */
+
+  useEffect(() => {
+    const loadPayment = async () => {
+      if (!paymentId) {
+        setLoadError(
+          "Invalid payment."
+        );
+
+        setIsLoading(false);
+
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const response =
+          await fetch(
+            `${API_URL}/${paymentId}`
+          );
+
+        if (!response.ok) {
+          if (
+            response.status === 404
+          ) {
+            throw new Error(
+              "Payment not found."
+            );
+          }
+
+          throw new Error(
+            "Unable to load payment."
+          );
+        }
+
+        const data: Payment =
+          await response.json();
+
+        setPayment(data);
+      } catch (error) {
+        console.error(
+          "Failed to load payment:",
+          error
+        );
+
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load payment."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPayment();
+  }, [paymentId]);
+
+  /*
+   * Loading
+   */
+
+  if (isLoading) {
     return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center">
-        <h1 className="text-xl font-semibold">
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <p className="font-semibold text-slate-900">
+          Loading receipt...
+        </p>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Fetching payment details.
+        </p>
+      </div>
+    );
+  }
+
+  /*
+   * Not found / error
+   */
+
+  if (
+    loadError ||
+    !payment
+  ) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-900">
           Receipt not found
         </h1>
+
+        <p className="mt-2 text-sm text-slate-500">
+          {loadError ||
+            "The requested payment receipt could not be found."}
+        </p>
 
         <div className="mt-6">
           <AppButton
@@ -47,6 +170,11 @@ export default function Receipt() {
     );
   }
 
+  const receiptNumber =
+    `PAY-${String(
+      payment.id
+    ).padStart(4, "0")}`;
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       {/* Controls */}
@@ -58,7 +186,8 @@ export default function Receipt() {
             onClick={() =>
               navigate("/payments")
             }
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            aria-label="Back to payments"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -69,7 +198,7 @@ export default function Receipt() {
             </h1>
 
             <p className="text-sm text-slate-500">
-              {payment.receiptNumber}
+              {receiptNumber}
             </p>
           </div>
         </div>
@@ -89,6 +218,8 @@ export default function Receipt() {
       {/* Receipt */}
 
       <article className="bg-white p-8 shadow-sm ring-1 ring-slate-200 print:p-0 print:shadow-none print:ring-0 sm:p-12">
+        {/* Clinic Header */}
+
         <header className="border-b-2 border-slate-900 pb-6">
           <div className="flex items-start justify-between gap-5">
             <div className="flex gap-4">
@@ -111,40 +242,56 @@ export default function Receipt() {
           </div>
         </header>
 
+        {/* Receipt Details */}
+
         <section className="grid gap-5 border-b border-slate-200 py-6 sm:grid-cols-2">
           <ReceiptField
             label="Receipt No."
-            value={payment.receiptNumber}
+            value={
+              receiptNumber
+            }
           />
 
           <ReceiptField
             label="Date"
-            value={payment.date}
+            value={formatDateTime(
+              payment.paymentDate
+            )}
             right
           />
 
           <ReceiptField
             label="Patient"
-            value={payment.patientName}
+            value={
+              payment.patientName
+            }
           />
 
           <ReceiptField
             label="UHID"
-            value={payment.uhid}
+            value={
+              payment.patientUhid
+            }
             right
           />
 
           <ReceiptField
             label="Bill No."
-            value={payment.billNumber}
+            value={
+              payment.billNumber
+            }
           />
 
           <ReceiptField
             label="Payment Method"
-            value={payment.method}
+            value={
+              payment.method
+            }
             right
           />
         </section>
+
+        {/* Amount */}
 
         <section className="py-10 text-center">
           <p className="text-sm font-medium uppercase tracking-wide text-slate-400">
@@ -152,7 +299,9 @@ export default function Receipt() {
           </p>
 
           <p className="mt-3 text-5xl font-bold tracking-tight text-slate-900">
-            {currency(payment.amount)}
+            {currency(
+              payment.amount
+            )}
           </p>
 
           <div className="mx-auto mt-5 inline-flex rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
@@ -160,14 +309,20 @@ export default function Receipt() {
           </div>
         </section>
 
+        {/* Reference */}
+
         {payment.reference && (
           <section className="border-t border-slate-200 py-5">
             <ReceiptField
               label="Transaction Reference"
-              value={payment.reference}
+              value={
+                payment.reference
+              }
             />
           </section>
         )}
+
+        {/* Notes */}
 
         {payment.notes && (
           <section className="border-t border-slate-200 py-5">
@@ -175,11 +330,13 @@ export default function Receipt() {
               Notes
             </p>
 
-            <p className="mt-2 text-sm text-slate-700">
+            <p className="mt-2 whitespace-pre-line text-sm text-slate-700">
               {payment.notes}
             </p>
           </section>
         )}
+
+        {/* Footer */}
 
         <footer className="mt-16 flex justify-end">
           <div className="min-w-[200px] border-t border-slate-400 pt-3 text-center">
@@ -207,7 +364,13 @@ function ReceiptField({
   right?: boolean;
 }) {
   return (
-    <div className={right ? "sm:text-right" : ""}>
+    <div
+      className={
+        right
+          ? "sm:text-right"
+          : ""
+      }
+    >
       <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </p>
@@ -216,5 +379,31 @@ function ReceiptField({
         {value}
       </p>
     </div>
+  );
+}
+
+function formatDateTime(
+  value: string
+) {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value;
+  }
+
+  return date.toLocaleString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }
   );
 }

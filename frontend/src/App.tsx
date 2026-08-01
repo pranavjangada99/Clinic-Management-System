@@ -17,6 +17,7 @@ import Patients from "./features/patients/Patients";
 /* Appointments */
 import AddAppointment from "./features/appointments/AddAppointment";
 import Appointments from "./features/appointments/Appointments";
+import AppointmentDetails from "./features/appointments/AppointmentDetails";
 
 /* Visits */
 import Consultation from "./features/visits/Consultation";
@@ -60,137 +61,85 @@ function App() {
           {/* Patients */}
           {/* ========================= */}
 
-          <Route
-            path="/patients"
-            element={<Patients />}
-          />
+          <Route path="/patients" element={<Patients />} />
 
-          <Route
-            path="/patients/add"
-            element={<AddPatient />}
-          />
+          <Route path="/patients/add" element={<AddPatient />} />
 
-          <Route
-            path="/patients/:patientId"
-            element={<PatientProfile />}
-          />
+          <Route path="/patients/:patientId" element={<PatientProfile />} />
 
-          <Route
-            path="/patients/:patientId/edit"
-            element={<EditPatient />}
-          />
+          <Route path="/patients/:patientId/edit" element={<EditPatient />} />
 
           {/* ========================= */}
           {/* Appointments */}
           {/* ========================= */}
 
-          <Route
-            path="/appointments"
-            element={<Appointments />}
-          />
+          <Route path="/appointments" element={<Appointments />} />
+
+          <Route path="/appointments/add" element={<AddAppointment />} />
 
           <Route
-            path="/appointments/add"
-            element={<AddAppointment />}
+            path="/appointments/:appointmentId"
+            element={<AppointmentDetails />}
           />
 
           {/* ========================= */}
           {/* Visits */}
           {/* ========================= */}
 
-          <Route
-            path="/visits"
-            element={<Visits />}
-          />
+          <Route path="/visits" element={<Visits />} />
 
-          <Route
-            path="/visits/new"
-            element={<Consultation />}
-          />
+          <Route path="/visits/new" element={<Consultation />} />
 
           <Route
             path="/visits/:visitId/consultation"
             element={<Consultation />}
           />
 
-          <Route
-            path="/visits/:visitId"
-            element={<VisitDetails />}
-          />
+          <Route path="/visits/:visitId" element={<VisitDetails />} />
 
           {/* ========================= */}
           {/* Prescription */}
           {/* ========================= */}
 
-          <Route
-            path="/prescriptions/:visitId"
-            element={<Prescription />}
-          />
+          <Route path="/prescriptions/:visitId" element={<Prescription />} />
 
           {/* ========================= */}
           {/* Billing */}
           {/* ========================= */}
 
-          <Route
-            path="/billing"
-            element={<Billing />}
-          />
+          <Route path="/billing" element={<Billing />} />
 
-          <Route
-            path="/billing/new"
-            element={<CreateBill />}
-          />
+          <Route path="/billing/new" element={<CreateBill />} />
 
-          <Route
-            path="/billing/:billId"
-            element={<BillDetails />}
-          />
+          <Route path="/billing/:billId" element={<BillDetails />} />
 
           {/* ========================= */}
           {/* Payments */}
           {/* ========================= */}
 
-          <Route
-            path="/payments"
-            element={<Payments />}
-          />
+          <Route path="/payments" element={<Payments />} />
 
-          <Route
-            path="/payments/new"
-            element={<RecordPayment />}
-          />
+          <Route path="/payments/new" element={<RecordPayment />} />
 
-          <Route
-            path="/payments/:paymentId/receipt"
-            element={<Receipt />}
-          />
+          <Route path="/payments/:paymentId/receipt" element={<Receipt />} />
 
           {/* ========================= */}
           {/* Reports */}
           {/* ========================= */}
 
-          <Route
-            path="/reports"
-            element={<Reports />}
-          />
+          <Route path="/reports" element={<Reports />} />
 
           {/* ========================= */}
           {/* Settings */}
           {/* ========================= */}
 
-          <Route
-            path="/settings"
-            element={<Settings />}
-          />
+          <Route path="/settings" element={<Settings />} />
 
           {/* ========================= */}
           {/* 404 - KEEP THIS LAST */}
           {/* ========================= */}
 
-          <Route
-            path="*"
-            element={<NotFound />}
-          />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AppLayout>
     </BrowserRouter>

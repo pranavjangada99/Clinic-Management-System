@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+
 import {
   ArrowLeft,
   ClipboardPlus,
@@ -10,64 +11,132 @@ import {
 } from "lucide-react";
 
 import AppButton from "@/components/ui/app/AppButton";
-import { patients } from "./data/patients";
-import type { PatientGender } from "./types";
+
+interface Patient {
+  id: number;
+  uhid: string;
+  name: string;
+  dateOfBirth: string;
+  age: number;
+  gender: string;
+  mobile: string;
+  alternateMobile: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  pinCode: string | null;
+  bloodGroup: string | null;
+  referredBy: string | null;
+  notes: string | null;
+  status: string;
+}
 
 interface PatientForm {
   fullName: string;
   mobile: string;
   dateOfBirth: string;
   age: string;
-  gender: PatientGender | "";
+  gender: string;
   address: string;
   city: string;
   pincode: string;
   bloodGroup: string;
   referredBy: string;
+  status: string;
 }
+
+const API_URL = "http://localhost:5230/api/patients";
+
+const emptyForm: PatientForm = {
+  fullName: "",
+  mobile: "",
+  dateOfBirth: "",
+  age: "",
+  gender: "",
+  address: "",
+  city: "",
+  pincode: "",
+  bloodGroup: "",
+  referredBy: "",
+  status: "Active",
+};
 
 export default function EditPatient() {
   const navigate = useNavigate();
   const { patientId } = useParams();
 
-  const patient = patients.find(
-    (item) => item.id === Number(patientId)
-  );
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [form, setForm] = useState<PatientForm>(emptyForm);
 
-  const [form, setForm] = useState<PatientForm>(() => ({
-    fullName: patient?.name ?? "",
-    mobile: patient?.mobile ?? "",
-    dateOfBirth: "",
-    age: patient ? String(patient.age) : "",
-    gender: patient?.gender ?? "",
-    address: "",
-    city: "",
-    pincode: "",
-    bloodGroup: "",
-    referredBy: "",
-  }));
+  const [errors, setErrors] =
+    useState<Record<string, string>>({});
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (!patient) {
-    return (
-      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">
-          Patient not found
-        </h1>
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
 
-        <p className="mt-2 text-sm text-slate-500">
-          The patient record you're trying to edit doesn't exist.
-        </p>
+  useEffect(() => {
+    const loadPatient = async () => {
+      if (!patientId) {
+        setLoadError("Invalid patient.");
+        setIsLoading(false);
+        return;
+      }
 
-        <div className="mt-6">
-          <AppButton onClick={() => navigate("/patients")}>
-            Back to Patients
-          </AppButton>
-        </div>
-      </div>
-    );
-  }
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const response = await fetch(
+          `${API_URL}/${patientId}`
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load patient."
+          );
+        }
+
+        const data: Patient =
+          await response.json();
+
+        setPatient(data);
+
+        setForm({
+          fullName: data.name,
+          mobile: data.mobile,
+          dateOfBirth: data.dateOfBirth,
+          age: String(data.age),
+          gender: data.gender,
+          address: data.address ?? "",
+          city: data.city ?? "",
+          pincode: data.pinCode ?? "",
+          bloodGroup: data.bloodGroup ?? "",
+
+          // Uses the real ReferredBy database field
+          referredBy: data.referredBy ?? "",
+
+          status: data.status,
+        });
+      } catch (error) {
+        console.error(
+          "Failed to load patient:",
+          error
+        );
+
+        setLoadError(
+          "Unable to load this patient. Make sure the clinic server is running."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPatient();
+  }, [patientId]);
 
   const updateField = (
     field: keyof PatientForm,
@@ -84,9 +153,15 @@ export default function EditPatient() {
         [field]: "",
       }));
     }
+
+    if (saveError) {
+      setSaveError("");
+    }
   };
 
-  const handleDateOfBirth = (value: string) => {
+  const handleDateOfBirth = (
+    value: string
+  ) => {
     updateField("dateOfBirth", value);
 
     if (!value) {
@@ -94,30 +169,17 @@ export default function EditPatient() {
       return;
     }
 
-    const dob = new Date(`${value}T00:00:00`);
-    const today = new Date();
-
-    let age = today.getFullYear() - dob.getFullYear();
-
-    const monthDifference =
-      today.getMonth() - dob.getMonth();
-
-    if (
-      monthDifference < 0 ||
-      (monthDifference === 0 &&
-        today.getDate() < dob.getDate())
-    ) {
-      age--;
-    }
-
     updateField(
       "age",
-      age >= 0 ? String(age) : ""
+      String(calculateAge(value))
     );
   };
 
   const validate = () => {
-    const newErrors: Record<string, string> = {};
+    const newErrors: Record<
+      string,
+      string
+    > = {};
 
     if (!form.fullName.trim()) {
       newErrors.fullName =
@@ -127,9 +189,28 @@ export default function EditPatient() {
     if (!form.mobile.trim()) {
       newErrors.mobile =
         "Mobile number is required.";
-    } else if (!/^[6-9]\d{9}$/.test(form.mobile)) {
+    } else if (
+      !/^[6-9]\d{9}$/.test(form.mobile)
+    ) {
       newErrors.mobile =
         "Enter a valid 10-digit mobile number.";
+    }
+
+    if (!form.dateOfBirth) {
+      newErrors.dateOfBirth =
+        "Date of birth is required.";
+    } else {
+      const dob = new Date(
+        `${form.dateOfBirth}T00:00:00`
+      );
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dob > today) {
+        newErrors.dateOfBirth =
+          "Date of birth cannot be in the future.";
+      }
     }
 
     if (!form.gender) {
@@ -147,31 +228,169 @@ export default function EditPatient() {
 
     setErrors(newErrors);
 
-    return Object.keys(newErrors).length === 0;
+    return (
+      Object.keys(newErrors).length === 0
+    );
   };
 
-  const handleSubmit = (
+  const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
 
-    if (!validate()) {
+    if (!patient || !validate()) {
       return;
     }
 
-    console.log("Patient ready to update:", {
-      id: patient.id,
-      uhid: patient.uhid,
-      ...form,
-    });
+    try {
+      setIsSaving(true);
+      setSaveError("");
 
-    /*
-      Actual database update will be implemented
-      when the .NET API is connected.
-    */
+      const response = await fetch(
+        `${API_URL}/${patient.id}`,
+        {
+          method: "PUT",
 
-    navigate(`/patients/${patient.id}`);
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            name: form.fullName.trim(),
+
+            dateOfBirth:
+              form.dateOfBirth,
+
+            gender: form.gender,
+
+            mobile: form.mobile,
+
+            alternateMobile:
+              patient.alternateMobile,
+
+            email: patient.email,
+
+            address:
+              form.address.trim() ||
+              null,
+
+            city:
+              form.city.trim() || null,
+
+            state: patient.state,
+
+            pinCode:
+              form.pincode || null,
+
+            bloodGroup:
+              form.bloodGroup || null,
+
+            // Saves directly to ReferredBy
+            referredBy:
+              form.referredBy.trim() ||
+              null,
+
+            // Keep Notes separate
+            notes: patient.notes,
+
+            status: form.status,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        let message =
+          "Unable to update patient.";
+
+        try {
+          const errorData =
+            await response.json();
+
+          if (
+            typeof errorData ===
+            "string"
+          ) {
+            message = errorData;
+          } else if (
+            errorData?.title
+          ) {
+            message =
+              errorData.title;
+          }
+        } catch {
+          // Keep default message.
+        }
+
+        throw new Error(message);
+      }
+
+      navigate(
+        `/patients/${patient.id}`
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update patient:",
+        error
+      );
+
+      if (error instanceof TypeError) {
+        setSaveError(
+          "Cannot connect to the clinic server. Make sure the backend is running."
+        );
+      } else if (
+        error instanceof Error
+      ) {
+        setSaveError(error.message);
+      } else {
+        setSaveError(
+          "Something went wrong while updating the patient."
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <p className="font-semibold text-slate-900">
+          Loading patient...
+        </p>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Reading patient information
+          from the clinic database.
+        </p>
+      </div>
+    );
+  }
+
+  if (loadError || !patient) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-900">
+          Patient not found
+        </h1>
+
+        <p className="mt-2 text-sm text-slate-500">
+          {loadError ||
+            "The patient record you're trying to edit doesn't exist."}
+        </p>
+
+        <div className="mt-6">
+          <AppButton
+            onClick={() =>
+              navigate("/patients")
+            }
+          >
+            Back to Patients
+          </AppButton>
+        </div>
+      </div>
+    );
+  }
 
   const inputClass =
     "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50";
@@ -191,7 +410,9 @@ export default function EditPatient() {
           <button
             type="button"
             onClick={() =>
-              navigate(`/patients/${patient.id}`)
+              navigate(
+                `/patients/${patient.id}`
+              )
             }
             className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
             aria-label="Back to patient"
@@ -209,8 +430,8 @@ export default function EditPatient() {
             </h1>
 
             <p className="mt-1 text-slate-500">
-              Update {patient.name}'s registration
-              information.
+              Update {patient.name}'s
+              registration information.
             </p>
           </div>
         </div>
@@ -219,8 +440,11 @@ export default function EditPatient() {
           <AppButton
             type="button"
             variant="secondary"
+            disabled={isSaving}
             onClick={() =>
-              navigate(`/patients/${patient.id}`)
+              navigate(
+                `/patients/${patient.id}`
+              )
             }
           >
             Cancel
@@ -228,14 +452,25 @@ export default function EditPatient() {
 
           <AppButton
             type="submit"
+            disabled={isSaving}
             leftIcon={
               <Save className="h-4 w-4" />
             }
           >
-            Save Changes
+            {isSaving
+              ? "Saving..."
+              : "Save Changes"}
           </AppButton>
         </div>
       </div>
+
+      {/* Save Error */}
+
+      {saveError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
 
       {/* Personal Information */}
 
@@ -251,16 +486,19 @@ export default function EditPatient() {
             </h2>
 
             <p className="text-sm text-slate-500">
-              Basic details about the patient.
+              Basic details about the
+              patient.
             </p>
           </div>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {/* Name */}
+          {/* Full Name */}
 
           <div className="lg:col-span-2">
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Full Name{" "}
               <span className="text-red-500">
                 *
@@ -275,7 +513,6 @@ export default function EditPatient() {
                   event.target.value
                 )
               }
-              placeholder="Enter patient's full name"
               className={inputClass}
             />
 
@@ -289,7 +526,9 @@ export default function EditPatient() {
           {/* Mobile */}
 
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Mobile Number{" "}
               <span className="text-red-500">
                 *
@@ -310,7 +549,6 @@ export default function EditPatient() {
                   )
                 }
                 inputMode="numeric"
-                placeholder="9876543210"
                 className={`${inputClass} pl-11`}
               />
             </div>
@@ -322,16 +560,23 @@ export default function EditPatient() {
             )}
           </div>
 
-          {/* DOB */}
+          {/* Date of Birth */}
 
           <div>
-            <label className={labelClass}>
-              Date of Birth
+            <label
+              className={labelClass}
+            >
+              Date of Birth{" "}
+              <span className="text-red-500">
+                *
+              </span>
             </label>
 
             <input
               type="date"
-              value={form.dateOfBirth}
+              value={
+                form.dateOfBirth
+              }
               max={
                 new Date()
                   .toISOString()
@@ -344,34 +589,36 @@ export default function EditPatient() {
               }
               className={inputClass}
             />
+
+            {errors.dateOfBirth && (
+              <p className="mt-2 text-xs text-red-600">
+                {errors.dateOfBirth}
+              </p>
+            )}
           </div>
 
           {/* Age */}
 
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Age
             </label>
 
             <input
               value={form.age}
               readOnly
-              placeholder="Calculated from DOB"
               className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-600`}
             />
-
-            {!form.dateOfBirth && (
-              <p className="mt-2 text-xs text-slate-400">
-                Select date of birth to calculate
-                age.
-              </p>
-            )}
           </div>
 
           {/* Gender */}
 
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Gender{" "}
               <span className="text-red-500">
                 *
@@ -411,10 +658,43 @@ export default function EditPatient() {
               </p>
             )}
           </div>
+
+          {/* Status */}
+
+          <div>
+            <label
+              className={labelClass}
+            >
+              Status
+            </label>
+
+            <select
+              value={form.status}
+              onChange={(event) =>
+                updateField(
+                  "status",
+                  event.target.value
+                )
+              }
+              className={inputClass}
+            >
+              <option value="Active">
+                Active
+              </option>
+
+              <option value="Follow-up">
+                Follow-up
+              </option>
+
+              <option value="Inactive">
+                Inactive
+              </option>
+            </select>
+          </div>
         </div>
       </section>
 
-      {/* Contact */}
+      {/* Contact Information */}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-6 flex items-center gap-3">
@@ -428,14 +708,19 @@ export default function EditPatient() {
             </h2>
 
             <p className="text-sm text-slate-500">
-              Patient's address and location.
+              Patient's address and
+              location.
             </p>
           </div>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
+          {/* Address */}
+
           <div className="md:col-span-2">
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Address
             </label>
 
@@ -447,14 +732,17 @@ export default function EditPatient() {
                   event.target.value
                 )
               }
-              placeholder="House, street, area..."
               rows={3}
-              className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
             />
           </div>
 
+          {/* City */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               City
             </label>
 
@@ -466,13 +754,16 @@ export default function EditPatient() {
                   event.target.value
                 )
               }
-              placeholder="City"
               className={inputClass}
             />
           </div>
 
+          {/* Pincode */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Pincode
             </label>
 
@@ -487,7 +778,6 @@ export default function EditPatient() {
                 )
               }
               inputMode="numeric"
-              placeholder="422001"
               className={inputClass}
             />
 
@@ -500,7 +790,7 @@ export default function EditPatient() {
         </div>
       </section>
 
-      {/* Additional */}
+      {/* Additional Information */}
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div className="mb-6 flex items-center gap-3">
@@ -514,19 +804,26 @@ export default function EditPatient() {
             </h2>
 
             <p className="text-sm text-slate-500">
-              Additional registration details.
+              Additional registration
+              details.
             </p>
           </div>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2">
+          {/* Blood Group */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Blood Group
             </label>
 
             <select
-              value={form.bloodGroup}
+              value={
+                form.bloodGroup
+              }
               onChange={(event) =>
                 updateField(
                   "bloodGroup",
@@ -538,24 +835,47 @@ export default function EditPatient() {
               <option value="">
                 Select blood group
               </option>
-              <option value="A+">A+</option>
-              <option value="A-">A-</option>
-              <option value="B+">B+</option>
-              <option value="B-">B-</option>
-              <option value="AB+">AB+</option>
-              <option value="AB-">AB-</option>
-              <option value="O+">O+</option>
-              <option value="O-">O-</option>
+
+              <option value="A+">
+                A+
+              </option>
+              <option value="A-">
+                A-
+              </option>
+              <option value="B+">
+                B+
+              </option>
+              <option value="B-">
+                B-
+              </option>
+              <option value="AB+">
+                AB+
+              </option>
+              <option value="AB-">
+                AB-
+              </option>
+              <option value="O+">
+                O+
+              </option>
+              <option value="O-">
+                O-
+              </option>
             </select>
           </div>
 
+          {/* Referred By */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Referred By
             </label>
 
             <input
-              value={form.referredBy}
+              value={
+                form.referredBy
+              }
               onChange={(event) =>
                 updateField(
                   "referredBy",
@@ -569,14 +889,17 @@ export default function EditPatient() {
         </div>
       </section>
 
-      {/* Mobile buttons */}
+      {/* Mobile Actions */}
 
       <div className="grid grid-cols-2 gap-3 pb-4 sm:hidden">
         <AppButton
           type="button"
           variant="secondary"
+          disabled={isSaving}
           onClick={() =>
-            navigate(`/patients/${patient.id}`)
+            navigate(
+              `/patients/${patient.id}`
+            )
           }
         >
           Cancel
@@ -584,13 +907,45 @@ export default function EditPatient() {
 
         <AppButton
           type="submit"
+          disabled={isSaving}
           leftIcon={
             <Save className="h-4 w-4" />
           }
         >
-          Save Changes
+          {isSaving
+            ? "Saving..."
+            : "Save Changes"}
         </AppButton>
       </div>
     </form>
   );
+}
+
+function calculateAge(
+  dateOfBirth: string
+) {
+  const dob = new Date(
+    `${dateOfBirth}T00:00:00`
+  );
+
+  const today = new Date();
+
+  let age =
+    today.getFullYear() -
+    dob.getFullYear();
+
+  const monthDifference =
+    today.getMonth() -
+    dob.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 &&
+      today.getDate() <
+        dob.getDate())
+  ) {
+    age--;
+  }
+
+  return Math.max(age, 0);
 }

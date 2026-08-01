@@ -13,12 +13,19 @@ export type AppointmentType =
 export interface Appointment {
   id: number;
   patientId: number;
+
+  patientUhid: string;
   patientName: string;
-  uhid: string;
-  date: string;
-  time: string;
+  patientMobile: string;
+
+  appointmentDate: string;
+  appointmentTime: string;
+
   type: AppointmentType;
   doctor: string;
-  reason: string;
+  reason: string | null;
   status: AppointmentStatus;
+
+  createdAt: string;
+  updatedAt: string;
 }

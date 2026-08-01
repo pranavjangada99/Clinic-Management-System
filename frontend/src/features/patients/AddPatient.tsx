@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   ArrowLeft,
   ClipboardPlus,
@@ -24,6 +25,12 @@ interface PatientForm {
   referredBy: string;
 }
 
+interface CreatedPatient {
+  id: number;
+  uhid: string;
+  name: string;
+}
+
 const initialForm: PatientForm = {
   fullName: "",
   mobile: "",
@@ -37,13 +44,24 @@ const initialForm: PatientForm = {
   referredBy: "",
 };
 
+const API_URL = "http://localhost:5230/api/patients";
+
 export default function AddPatient() {
   const navigate = useNavigate();
 
   const [form, setForm] = useState<PatientForm>(initialForm);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const updateField = (field: keyof PatientForm, value: string) => {
+  const [errors, setErrors] =
+    useState<Record<string, string>>({});
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [saveError, setSaveError] = useState("");
+
+  const updateField = (
+    field: keyof PatientForm,
+    value: string
+  ) => {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -55,6 +73,10 @@ export default function AddPatient() {
         [field]: "",
       }));
     }
+
+    if (saveError) {
+      setSaveError("");
+    }
   };
 
   const handleDateOfBirth = (value: string) => {
@@ -65,42 +87,73 @@ export default function AddPatient() {
       return;
     }
 
-    const dob = new Date(value);
+    const dob = new Date(`${value}T00:00:00`);
     const today = new Date();
 
-    let age = today.getFullYear() - dob.getFullYear();
+    let age =
+      today.getFullYear() - dob.getFullYear();
 
-    const monthDifference = today.getMonth() - dob.getMonth();
+    const monthDifference =
+      today.getMonth() - dob.getMonth();
 
     if (
       monthDifference < 0 ||
-      (monthDifference === 0 && today.getDate() < dob.getDate())
+      (monthDifference === 0 &&
+        today.getDate() < dob.getDate())
     ) {
       age--;
     }
 
-    updateField("age", age >= 0 ? String(age) : "");
+    updateField(
+      "age",
+      age >= 0 ? String(age) : ""
+    );
   };
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
     if (!form.fullName.trim()) {
-      newErrors.fullName = "Patient name is required.";
+      newErrors.fullName =
+        "Patient name is required.";
     }
 
     if (!form.mobile.trim()) {
-      newErrors.mobile = "Mobile number is required.";
+      newErrors.mobile =
+        "Mobile number is required.";
     } else if (!/^[6-9]\d{9}$/.test(form.mobile)) {
-      newErrors.mobile = "Enter a valid 10-digit mobile number.";
+      newErrors.mobile =
+        "Enter a valid 10-digit mobile number.";
+    }
+
+    if (!form.dateOfBirth) {
+      newErrors.dateOfBirth =
+        "Date of birth is required.";
+    } else {
+      const dob = new Date(
+        `${form.dateOfBirth}T00:00:00`
+      );
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dob > today) {
+        newErrors.dateOfBirth =
+          "Date of birth cannot be in the future.";
+      }
     }
 
     if (!form.gender) {
-      newErrors.gender = "Please select gender.";
+      newErrors.gender =
+        "Please select gender.";
     }
 
-    if (form.pincode && !/^\d{6}$/.test(form.pincode)) {
-      newErrors.pincode = "Enter a valid 6-digit pincode.";
+    if (
+      form.pincode &&
+      !/^\d{6}$/.test(form.pincode)
+    ) {
+      newErrors.pincode =
+        "Enter a valid 6-digit pincode.";
     }
 
     setErrors(newErrors);
@@ -108,17 +161,104 @@ export default function AddPatient() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
 
     if (!validate()) {
       return;
     }
 
-    console.log("Patient ready to save:", form);
+    setIsSaving(true);
+    setSaveError("");
 
-    // Backend/database saving will be connected later.
-    navigate("/patients");
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          name: form.fullName.trim(),
+
+          dateOfBirth: form.dateOfBirth,
+
+          gender: form.gender,
+
+          mobile: form.mobile,
+
+          alternateMobile: null,
+
+          email: null,
+
+          address:
+            form.address.trim() || null,
+
+          city:
+            form.city.trim() || null,
+
+          state: null,
+
+          pinCode:
+            form.pincode || null,
+
+          bloodGroup:
+            form.bloodGroup || null,
+
+          referredBy:
+            form.referredBy.trim() || null,
+
+          notes: null,
+        }),
+      });
+
+      if (!response.ok) {
+        let message =
+          "Unable to save patient.";
+
+        try {
+          const errorData =
+            await response.json();
+
+          if (typeof errorData === "string") {
+            message = errorData;
+          } else if (errorData?.title) {
+            message = errorData.title;
+          }
+        } catch {
+          // Keep default message.
+        }
+
+        throw new Error(message);
+      }
+
+      const patient: CreatedPatient =
+        await response.json();
+
+      navigate(`/patients/${patient.id}`);
+    } catch (error) {
+      console.error(
+        "Failed to save patient:",
+        error
+      );
+
+      if (error instanceof TypeError) {
+        setSaveError(
+          "Cannot connect to the clinic server. Make sure the backend is running."
+        );
+      } else if (error instanceof Error) {
+        setSaveError(error.message);
+      } else {
+        setSaveError(
+          "Something went wrong while saving the patient."
+        );
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const inputClass =
@@ -160,6 +300,7 @@ export default function AddPatient() {
           <AppButton
             type="button"
             variant="secondary"
+            disabled={isSaving}
             onClick={() => navigate("/patients")}
           >
             Cancel
@@ -167,12 +308,23 @@ export default function AddPatient() {
 
           <AppButton
             type="submit"
+            disabled={isSaving}
             leftIcon={<Save className="h-4 w-4" />}
           >
-            Save Patient
+            {isSaving
+              ? "Saving..."
+              : "Save Patient"}
           </AppButton>
         </div>
       </div>
+
+      {/* Save Error */}
+
+      {saveError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
 
       {/* Personal Information */}
 
@@ -198,13 +350,17 @@ export default function AddPatient() {
 
           <div className="lg:col-span-2">
             <label className={labelClass}>
-              Full Name <span className="text-red-500">*</span>
+              Full Name{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <input
               value={form.fullName}
               onChange={(event) =>
-                updateField("fullName", event.target.value)
+                updateField(
+                  "fullName",
+                  event.target.value
+                )
               }
               placeholder="Enter patient's full name"
               className={inputClass}
@@ -221,7 +377,8 @@ export default function AddPatient() {
 
           <div>
             <label className={labelClass}>
-              Mobile Number <span className="text-red-500">*</span>
+              Mobile Number{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <div className="relative">
@@ -254,31 +411,45 @@ export default function AddPatient() {
 
           <div>
             <label className={labelClass}>
-              Date of Birth
+              Date of Birth{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <input
               type="date"
               value={form.dateOfBirth}
+              max={
+                new Date()
+                  .toISOString()
+                  .split("T")[0]
+              }
               onChange={(event) =>
-                handleDateOfBirth(event.target.value)
+                handleDateOfBirth(
+                  event.target.value
+                )
               }
               className={inputClass}
             />
+
+            {errors.dateOfBirth && (
+              <p className="mt-2 text-xs text-red-600">
+                {errors.dateOfBirth}
+              </p>
+            )}
           </div>
 
           {/* Age */}
 
           <div>
             <label className={labelClass}>
-                Age
+              Age
             </label>
 
             <input
-                value={form.age}
-                readOnly
-                placeholder="Calculated from DOB"
-                className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-600`}
+              value={form.age}
+              readOnly
+              placeholder="Calculated from DOB"
+              className={`${inputClass} cursor-not-allowed bg-slate-50 text-slate-600`}
             />
           </div>
 
@@ -286,13 +457,17 @@ export default function AddPatient() {
 
           <div>
             <label className={labelClass}>
-              Gender <span className="text-red-500">*</span>
+              Gender{" "}
+              <span className="text-red-500">*</span>
             </label>
 
             <select
               value={form.gender}
               onChange={(event) =>
-                updateField("gender", event.target.value)
+                updateField(
+                  "gender",
+                  event.target.value
+                )
               }
               className={inputClass}
             >
@@ -352,7 +527,10 @@ export default function AddPatient() {
             <textarea
               value={form.address}
               onChange={(event) =>
-                updateField("address", event.target.value)
+                updateField(
+                  "address",
+                  event.target.value
+                )
               }
               placeholder="House, street, area..."
               rows={3}
@@ -370,7 +548,10 @@ export default function AddPatient() {
             <input
               value={form.city}
               onChange={(event) =>
-                updateField("city", event.target.value)
+                updateField(
+                  "city",
+                  event.target.value
+                )
               }
               placeholder="City"
               className={inputClass}
@@ -438,7 +619,10 @@ export default function AddPatient() {
             <select
               value={form.bloodGroup}
               onChange={(event) =>
-                updateField("bloodGroup", event.target.value)
+                updateField(
+                  "bloodGroup",
+                  event.target.value
+                )
               }
               className={inputClass}
             >
@@ -467,7 +651,10 @@ export default function AddPatient() {
             <input
               value={form.referredBy}
               onChange={(event) =>
-                updateField("referredBy", event.target.value)
+                updateField(
+                  "referredBy",
+                  event.target.value
+                )
               }
               placeholder="Doctor, patient, Google, etc."
               className={inputClass}
@@ -482,6 +669,7 @@ export default function AddPatient() {
         <AppButton
           type="button"
           variant="secondary"
+          disabled={isSaving}
           onClick={() => navigate("/patients")}
         >
           Cancel
@@ -489,9 +677,12 @@ export default function AddPatient() {
 
         <AppButton
           type="submit"
+          disabled={isSaving}
           leftIcon={<Save className="h-4 w-4" />}
         >
-          Save Patient
+          {isSaving
+            ? "Saving..."
+            : "Save Patient"}
         </AppButton>
       </div>
     </form>

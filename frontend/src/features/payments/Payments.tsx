@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -10,7 +15,29 @@ import {
 
 import AppButton from "@/components/ui/app/AppButton";
 
-import { payments } from "./data/payments";
+interface Payment {
+  id: number;
+
+  billId: number;
+  billNumber: string;
+
+  patientId: number;
+  patientName: string;
+  patientUhid: string;
+
+  amount: number;
+
+  method: string;
+
+  reference: string | null;
+  notes: string | null;
+
+  paymentDate: string;
+  createdAt: string;
+}
+
+const API_URL =
+  "http://localhost:5230/api/payments";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -18,27 +45,94 @@ const currency = (value: number) =>
 export default function Payments() {
   const navigate = useNavigate();
 
-  const [search, setSearch] = useState("");
+  const [payments, setPayments] =
+    useState<Payment[]>([]);
 
-  const filteredPayments = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  const [search, setSearch] =
+    useState("");
 
-    return payments.filter(
-      (payment) =>
-        payment.patientName
-          .toLowerCase()
-          .includes(query) ||
-        payment.uhid
-          .toLowerCase()
-          .includes(query) ||
-        payment.receiptNumber
-          .toLowerCase()
-          .includes(query) ||
-        payment.billNumber
-          .toLowerCase()
-          .includes(query)
-    );
-  }, [search]);
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  /*
+   * Load payments from database
+   */
+
+  useEffect(() => {
+    const loadPayments = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const response =
+          await fetch(API_URL);
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load payments."
+          );
+        }
+
+        const data: Payment[] =
+          await response.json();
+
+        setPayments(data);
+      } catch (error) {
+        console.error(
+          "Failed to load payments:",
+          error
+        );
+
+        setLoadError(
+          "Unable to load payments. Make sure the clinic server is running."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadPayments();
+  }, []);
+
+  /*
+   * Search
+   */
+
+  const filteredPayments =
+    useMemo(() => {
+      const query =
+        search.trim().toLowerCase();
+
+      if (!query) {
+        return payments;
+      }
+
+      return payments.filter(
+        (payment) =>
+          payment.patientName
+            .toLowerCase()
+            .includes(query) ||
+          payment.patientUhid
+            .toLowerCase()
+            .includes(query) ||
+          payment.billNumber
+            .toLowerCase()
+            .includes(query) ||
+          payment.method
+            .toLowerCase()
+            .includes(query) ||
+          (payment.reference ?? "")
+            .toLowerCase()
+            .includes(query)
+      );
+    }, [payments, search]);
+
+  /*
+   * Summary
+   */
 
   const total = payments.reduce(
     (sum, payment) =>
@@ -70,7 +164,9 @@ export default function Payments() {
           onClick={() =>
             navigate("/payments/new")
           }
-          leftIcon={<Plus className="h-4 w-4" />}
+          leftIcon={
+            <Plus className="h-4 w-4" />
+          }
         >
           Record Payment
         </AppButton>
@@ -85,7 +181,9 @@ export default function Payments() {
           </p>
 
           <p className="mt-2 text-3xl font-bold text-slate-900">
-            {payments.length}
+            {isLoading
+              ? "—"
+              : payments.length}
           </p>
         </div>
 
@@ -99,7 +197,9 @@ export default function Payments() {
           </div>
 
           <p className="mt-2 text-3xl font-bold text-slate-900">
-            {currency(total)}
+            {isLoading
+              ? "—"
+              : currency(total)}
           </p>
         </div>
       </div>
@@ -113,71 +213,185 @@ export default function Payments() {
           <input
             value={search}
             onChange={(event) =>
-              setSearch(event.target.value)
+              setSearch(
+                event.target.value
+              )
             }
-            placeholder="Search receipt, bill or patient..."
-            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
+            placeholder="Search bill, patient, UHID or reference..."
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-50"
           />
         </div>
       </div>
 
+      {/* Error */}
+
+      {loadError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+          {loadError}
+        </div>
+      )}
+
       {/* Table */}
 
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <div className="hidden grid-cols-[1.5fr_2fr_1.5fr_1fr_1fr_1.2fr] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
-          <span>Receipt</span>
+        <div className="hidden grid-cols-[1.2fr_2fr_1.5fr_1.3fr_1fr_1.2fr] gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500 md:grid">
+          <span>Payment</span>
+
           <span>Patient</span>
+
           <span>Bill</span>
+
           <span>Date</span>
+
           <span>Method</span>
+
           <span className="text-right">
             Amount
           </span>
         </div>
 
-        {filteredPayments.map((payment) => (
-          <button
-            key={payment.id}
-            type="button"
-            onClick={() =>
-              navigate(
-                `/payments/${payment.id}/receipt`
-              )
-            }
-            className="grid w-full gap-3 border-b border-slate-100 px-5 py-5 text-left transition last:border-0 hover:bg-blue-50/40 md:grid-cols-[1.5fr_2fr_1.5fr_1fr_1fr_1.2fr] md:items-center md:gap-4 md:px-6"
-          >
-            <span className="font-semibold text-blue-600">
-              {payment.receiptNumber}
-            </span>
+        {/* Loading */}
 
-            <div>
-              <p className="font-semibold text-slate-900">
-                {payment.patientName}
+        {isLoading && (
+          <div className="px-6 py-16 text-center">
+            <CreditCard className="mx-auto h-8 w-8 text-slate-300" />
+
+            <p className="mt-3 font-semibold text-slate-900">
+              Loading payments...
+            </p>
+          </div>
+        )}
+
+        {/* Payments */}
+
+        {!isLoading &&
+          filteredPayments.map(
+            (payment) => (
+              <button
+                key={payment.id}
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/payments/${payment.id}/receipt`
+                  )
+                }
+                className="grid w-full gap-3 border-b border-slate-100 px-5 py-5 text-left transition last:border-0 hover:bg-blue-50/40 md:grid-cols-[1.2fr_2fr_1.5fr_1.3fr_1fr_1.2fr] md:items-center md:gap-4 md:px-6"
+              >
+                {/* Payment */}
+
+                <div>
+                  <p className="font-semibold text-blue-600">
+                    PAY-
+                    {String(
+                      payment.id
+                    ).padStart(
+                      4,
+                      "0"
+                    )}
+                  </p>
+
+                  {payment.reference && (
+                    <p className="mt-1 truncate text-xs text-slate-400">
+                      {
+                        payment.reference
+                      }
+                    </p>
+                  )}
+                </div>
+
+                {/* Patient */}
+
+                <div>
+                  <p className="font-semibold text-slate-900">
+                    {
+                      payment.patientName
+                    }
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-400">
+                    {
+                      payment.patientUhid
+                    }
+                  </p>
+                </div>
+
+                {/* Bill */}
+
+                <span className="text-sm text-slate-600">
+                  {
+                    payment.billNumber
+                  }
+                </span>
+
+                {/* Date */}
+
+                <span className="text-sm text-slate-600">
+                  {formatDate(
+                    payment.paymentDate
+                  )}
+                </span>
+
+                {/* Method */}
+
+                <span className="text-sm text-slate-600">
+                  {payment.method}
+                </span>
+
+                {/* Amount */}
+
+                <span className="font-bold text-slate-900 md:text-right">
+                  {currency(
+                    payment.amount
+                  )}
+                </span>
+              </button>
+            )
+          )}
+
+        {/* Empty */}
+
+        {!isLoading &&
+          !loadError &&
+          filteredPayments.length ===
+            0 && (
+            <div className="px-6 py-16 text-center">
+              <CreditCard className="mx-auto h-8 w-8 text-slate-300" />
+
+              <p className="mt-3 font-semibold text-slate-900">
+                {payments.length === 0
+                  ? "No payments recorded yet"
+                  : "No payments found"}
               </p>
 
-              <p className="text-xs text-slate-400">
-                {payment.uhid}
+              <p className="mt-1 text-sm text-slate-500">
+                {payments.length === 0
+                  ? "Payments recorded against patient bills will appear here."
+                  : "Try changing your search."}
               </p>
             </div>
-
-            <span className="text-sm text-slate-600">
-              {payment.billNumber}
-            </span>
-
-            <span className="text-sm text-slate-600">
-              {payment.date}
-            </span>
-
-            <span className="text-sm text-slate-600">
-              {payment.method}
-            </span>
-
-            <span className="font-bold text-slate-900 md:text-right">
-              {currency(payment.amount)}
-            </span>
-          </button>
-        ))}
+          )}
       </div>
     </div>
+  );
+}
+
+function formatDate(
+  value: string
+) {
+  const date = new Date(value);
+
+  if (
+    Number.isNaN(date.getTime())
+  ) {
+    return value;
+  }
+
+  return date.toLocaleDateString(
+    "en-IN",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }
   );
 }

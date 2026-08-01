@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -14,6 +15,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileText,
+  Loader2,
   Plus,
   Save,
   Stethoscope,
@@ -23,17 +25,67 @@ import {
 
 import AppButton from "@/components/ui/app/AppButton";
 
-import { patients } from "@/features/patients/data/patients";
-
-import { visits } from "./data/visits";
-
 import type {
   Medicine,
   VisitStatus,
 } from "./types";
 
+interface Patient {
+  id: number;
+  uhid: string;
+  name: string;
+  dateOfBirth: string;
+  age: number;
+  gender: string;
+  mobile: string;
+  status: string;
+}
+
+interface ApiMedicine {
+  id: number;
+  name: string;
+  potency: string | null;
+  dose: string | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+}
+
+interface ApiVisit {
+  id: number;
+
+  patientId: number;
+  patientUhid: string;
+  patientName: string;
+  patientMobile: string;
+
+  appointmentId: number | null;
+
+  visitDate: string;
+  visitTime: string;
+
+  doctor: string;
+
+  chiefComplaints: string;
+  symptoms: string | null;
+  diagnosis: string | null;
+  clinicalNotes: string | null;
+
+  advice: string | null;
+  followUpDate: string | null;
+
+  status: VisitStatus;
+
+  medicines: ApiMedicine[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface ConsultationForm {
   patientId: string;
+
+  doctor: string;
 
   chiefComplaints: string;
   symptoms: string;
@@ -45,6 +97,12 @@ interface ConsultationForm {
 
   status: VisitStatus;
 }
+
+const PATIENTS_API =
+  "http://localhost:5230/api/patients";
+
+const VISITS_API =
+  "http://localhost:5230/api/visits";
 
 const emptyMedicine = (
   id: number
@@ -58,6 +116,22 @@ const emptyMedicine = (
   instructions: "",
 });
 
+const emptyForm: ConsultationForm = {
+  patientId: "",
+
+  doctor: "Dr. Sunil Jangada",
+
+  chiefComplaints: "",
+  symptoms: "",
+  diagnosis: "",
+  clinicalNotes: "",
+
+  advice: "",
+  followUpDate: "",
+
+  status: "In Progress",
+};
+
 export default function Consultation() {
   const navigate = useNavigate();
 
@@ -66,70 +140,228 @@ export default function Consultation() {
   const [searchParams] =
     useSearchParams();
 
-  const existingVisit =
-    visits.find(
-      (visit) =>
-        visit.id === Number(visitId)
-    );
-
   const requestedPatientId =
     searchParams.get("patientId") ?? "";
 
-  const initialPatientId =
-    existingVisit
-      ? String(existingVisit.patientId)
-      : patients.some(
-            (patient) =>
-              String(patient.id) ===
-              requestedPatientId
-          )
-        ? requestedPatientId
-        : "";
+  const requestedAppointmentId =
+    searchParams.get("appointmentId");
+
+  const [patients, setPatients] =
+    useState<Patient[]>([]);
 
   const [form, setForm] =
-    useState<ConsultationForm>({
-      patientId: initialPatientId,
-
-      chiefComplaints:
-        existingVisit?.chiefComplaints ??
-        "",
-
-      symptoms:
-        existingVisit?.symptoms ?? "",
-
-      diagnosis:
-        existingVisit?.diagnosis ?? "",
-
-      clinicalNotes:
-        existingVisit?.clinicalNotes ??
-        "",
-
-      advice:
-        existingVisit?.advice ?? "",
-
-      followUpDate:
-        existingVisit?.followUpDate ??
-        "",
-
-      status:
-        existingVisit?.status ===
-        "Completed"
-          ? "In Progress"
-          : existingVisit?.status ??
-            "In Progress",
-    });
+    useState<ConsultationForm>(
+      emptyForm
+    );
 
   const [medicines, setMedicines] =
-    useState<Medicine[]>(
-      existingVisit?.medicines.length
-        ? existingVisit.medicines
-        : [emptyMedicine(1)]
+    useState<Medicine[]>([
+      emptyMedicine(1),
+    ]);
+
+  const [currentVisitId, setCurrentVisitId] =
+    useState<number | null>(
+      visitId
+        ? Number(visitId)
+        : null
     );
+
+  const [
+    currentAppointmentId,
+    setCurrentAppointmentId,
+  ] = useState<number | null>(
+    requestedAppointmentId
+      ? Number(
+          requestedAppointmentId
+        )
+      : null
+  );
 
   const [errors, setErrors] =
     useState<Record<string, string>>(
       {}
     );
+
+  const [isLoading, setIsLoading] =
+    useState(true);
+
+  const [isSaving, setIsSaving] =
+    useState(false);
+
+  const [loadError, setLoadError] =
+    useState("");
+
+  const [saveError, setSaveError] =
+    useState("");
+
+  const [saveMessage, setSaveMessage] =
+    useState("");
+
+  /*
+   * Load patients and, when editing,
+   * load the existing visit.
+   */
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError("");
+
+        const patientsResponse =
+          await fetch(PATIENTS_API);
+
+        if (!patientsResponse.ok) {
+          throw new Error(
+            "Unable to load patients."
+          );
+        }
+
+        const patientData: Patient[] =
+          await patientsResponse.json();
+
+        setPatients(patientData);
+
+        /*
+         * Existing visit:
+         * /visits/:visitId/consultation
+         */
+        if (visitId) {
+          const visitResponse =
+            await fetch(
+              `${VISITS_API}/${visitId}`
+            );
+
+          if (!visitResponse.ok) {
+            throw new Error(
+              "Unable to load visit."
+            );
+          }
+
+          const visit: ApiVisit =
+            await visitResponse.json();
+
+          setCurrentVisitId(
+            visit.id
+          );
+
+          setCurrentAppointmentId(
+            visit.appointmentId
+          );
+
+          setForm({
+            patientId: String(
+              visit.patientId
+            ),
+
+            doctor:
+              visit.doctor,
+
+            chiefComplaints:
+              visit.chiefComplaints,
+
+            symptoms:
+              visit.symptoms ?? "",
+
+            diagnosis:
+              visit.diagnosis ?? "",
+
+            clinicalNotes:
+              visit.clinicalNotes ??
+              "",
+
+            advice:
+              visit.advice ?? "",
+
+            followUpDate:
+              visit.followUpDate ??
+              "",
+
+            status:
+              visit.status,
+          });
+
+          if (
+            visit.medicines.length >
+            0
+          ) {
+            setMedicines(
+              visit.medicines.map(
+                (medicine) => ({
+                  id: medicine.id,
+
+                  name:
+                    medicine.name,
+
+                  potency:
+                    medicine.potency ??
+                    "",
+
+                  dose:
+                    medicine.dose ??
+                    "",
+
+                  frequency:
+                    medicine.frequency ??
+                    "",
+
+                  duration:
+                    medicine.duration ??
+                    "",
+
+                  instructions:
+                    medicine.instructions ??
+                    "",
+                })
+              )
+            );
+          } else {
+            setMedicines([
+              emptyMedicine(1),
+            ]);
+          }
+
+          return;
+        }
+
+        /*
+         * New consultation.
+         * Preselect patient when patientId
+         * was supplied in the URL.
+         */
+        const patientExists =
+          patientData.some(
+            (patient) =>
+              String(patient.id) ===
+              requestedPatientId
+          );
+
+        setForm((current) => ({
+          ...current,
+
+          patientId:
+            patientExists
+              ? requestedPatientId
+              : "",
+        }));
+      } catch (error) {
+        console.error(
+          "Failed to load consultation:",
+          error
+        );
+
+        setLoadError(
+          "Unable to load consultation data. Make sure the clinic server is running."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [
+    visitId,
+    requestedPatientId,
+  ]);
 
   const selectedPatient =
     useMemo(
@@ -139,7 +371,10 @@ export default function Consultation() {
             String(patient.id) ===
             form.patientId
         ),
-      [form.patientId]
+      [
+        patients,
+        form.patientId,
+      ]
     );
 
   const updateField = (
@@ -156,6 +391,14 @@ export default function Consultation() {
         ...current,
         [field]: "",
       }));
+    }
+
+    if (saveError) {
+      setSaveError("");
+    }
+
+    if (saveMessage) {
+      setSaveMessage("");
     }
   };
 
@@ -177,6 +420,10 @@ export default function Consultation() {
           : medicine
       )
     );
+
+    if (saveMessage) {
+      setSaveMessage("");
+    }
   };
 
   const addMedicine = () => {
@@ -226,11 +473,25 @@ export default function Consultation() {
         "Please select a patient.";
     }
 
+    if (!form.doctor.trim()) {
+      newErrors.doctor =
+        "Doctor name is required.";
+    }
+
     if (
       !form.chiefComplaints.trim()
     ) {
       newErrors.chiefComplaints =
         "Chief complaint is required.";
+    }
+
+    if (
+      form.followUpDate &&
+      form.followUpDate <
+        getLocalDateString()
+    ) {
+      newErrors.followUpDate =
+        "Follow-up date cannot be in the past.";
     }
 
     setErrors(newErrors);
@@ -241,30 +502,415 @@ export default function Consultation() {
     );
   };
 
-  const handleComplete = () => {
-    if (!validate()) {
-      return;
-    }
-
-    console.log(
-      "Consultation ready:",
-      {
-        ...form,
-        medicines:
-          medicines.filter(
-            (medicine) =>
-              medicine.name.trim()
-          ),
+  /*
+   * Saves a new visit or updates the
+   * existing visit.
+   *
+   * Returns the saved visit when successful.
+   */
+  const saveVisit =
+    async (): Promise<ApiVisit | null> => {
+      if (!validate()) {
+        return null;
       }
+
+      try {
+        setIsSaving(true);
+        setSaveError("");
+        setSaveMessage("");
+
+        const medicinePayload =
+          medicines
+            .filter(
+              (medicine) =>
+                medicine.name.trim()
+            )
+            .map(
+              (medicine) => ({
+                name:
+                  medicine.name.trim(),
+
+                potency:
+                  cleanValue(
+                    medicine.potency
+                  ),
+
+                dose:
+                  cleanValue(
+                    medicine.dose
+                  ),
+
+                frequency:
+                  cleanValue(
+                    medicine.frequency
+                  ),
+
+                duration:
+                  cleanValue(
+                    medicine.duration
+                  ),
+
+                instructions:
+                  cleanValue(
+                    medicine.instructions
+                  ),
+              })
+            );
+
+        let response: Response;
+
+        /*
+         * Existing visit -> PUT
+         */
+        if (currentVisitId) {
+          response = await fetch(
+            `${VISITS_API}/${currentVisitId}`,
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                doctor:
+                  form.doctor.trim(),
+
+                chiefComplaints:
+                  form.chiefComplaints.trim(),
+
+                symptoms:
+                  cleanValue(
+                    form.symptoms
+                  ),
+
+                diagnosis:
+                  cleanValue(
+                    form.diagnosis
+                  ),
+
+                clinicalNotes:
+                  cleanValue(
+                    form.clinicalNotes
+                  ),
+
+                advice:
+                  cleanValue(
+                    form.advice
+                  ),
+
+                followUpDate:
+                  form.followUpDate ||
+                  null,
+
+                medicines:
+                  medicinePayload,
+              }),
+            }
+          );
+        } else {
+          /*
+           * New visit -> POST
+           */
+
+          const now = new Date();
+
+          response = await fetch(
+            VISITS_API,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                patientId:
+                  Number(
+                    form.patientId
+                  ),
+
+                appointmentId:
+                  currentAppointmentId,
+
+                visitDate:
+                  getLocalDateString(),
+
+                visitTime:
+                  getLocalTimeString(
+                    now
+                  ),
+
+                doctor:
+                  form.doctor.trim(),
+
+                chiefComplaints:
+                  form.chiefComplaints.trim(),
+
+                symptoms:
+                  cleanValue(
+                    form.symptoms
+                  ),
+
+                diagnosis:
+                  cleanValue(
+                    form.diagnosis
+                  ),
+
+                clinicalNotes:
+                  cleanValue(
+                    form.clinicalNotes
+                  ),
+
+                advice:
+                  cleanValue(
+                    form.advice
+                  ),
+
+                followUpDate:
+                  form.followUpDate ||
+                  null,
+
+                medicines:
+                  medicinePayload,
+              }),
+            }
+          );
+        }
+
+        if (!response.ok) {
+          const message =
+            await readApiError(
+              response
+            );
+
+          throw new Error(
+            message ||
+              "Unable to save consultation."
+          );
+        }
+
+        const savedVisit: ApiVisit =
+          await response.json();
+
+        setCurrentVisitId(
+          savedVisit.id
+        );
+
+        setCurrentAppointmentId(
+          savedVisit.appointmentId
+        );
+
+        setForm((current) => ({
+          ...current,
+          status:
+            savedVisit.status,
+        }));
+
+        /*
+         * Replace temporary medicine IDs
+         * with database IDs after saving.
+         */
+        if (
+          savedVisit.medicines.length >
+          0
+        ) {
+          setMedicines(
+            savedVisit.medicines.map(
+              (medicine) => ({
+                id: medicine.id,
+
+                name:
+                  medicine.name,
+
+                potency:
+                  medicine.potency ??
+                  "",
+
+                dose:
+                  medicine.dose ??
+                  "",
+
+                frequency:
+                  medicine.frequency ??
+                  "",
+
+                duration:
+                  medicine.duration ??
+                  "",
+
+                instructions:
+                  medicine.instructions ??
+                  "",
+              })
+            )
+          );
+        } else {
+          setMedicines([
+            emptyMedicine(1),
+          ]);
+        }
+
+        return savedVisit;
+      } catch (error) {
+        console.error(
+          "Failed to save consultation:",
+          error
+        );
+
+        if (
+          error instanceof TypeError
+        ) {
+          setSaveError(
+            "Cannot connect to the clinic server. Make sure the backend is running."
+          );
+        } else if (
+          error instanceof Error
+        ) {
+          setSaveError(
+            error.message
+          );
+        } else {
+          setSaveError(
+            "Something went wrong while saving the consultation."
+          );
+        }
+
+        return null;
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+  const handleSaveDraft =
+    async () => {
+      const savedVisit =
+        await saveVisit();
+
+      if (!savedVisit) {
+        return;
+      }
+
+      setSaveMessage(
+        "Consultation saved successfully."
+      );
+
+      /*
+       * Change the URL to the real visit
+       * route after the first save.
+       *
+       * This prevents another POST if the
+       * doctor continues editing.
+       */
+      navigate(
+        `/visits/${savedVisit.id}/consultation`,
+        {
+          replace: true,
+        }
+      );
+    };
+
+  const handleComplete =
+    async () => {
+      const savedVisit =
+        await saveVisit();
+
+      if (!savedVisit) {
+        return;
+      }
+
+      try {
+        setIsSaving(true);
+        setSaveError("");
+
+        const response =
+          await fetch(
+            `${VISITS_API}/${savedVisit.id}/complete`,
+            {
+              method: "PATCH",
+            }
+          );
+
+        if (!response.ok) {
+          const message =
+            await readApiError(
+              response
+            );
+
+          throw new Error(
+            message ||
+              "Unable to complete visit."
+          );
+        }
+
+        navigate(
+          `/visits/${savedVisit.id}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to complete visit:",
+          error
+        );
+
+        if (
+          error instanceof TypeError
+        ) {
+          setSaveError(
+            "Cannot connect to the clinic server. Make sure the backend is running."
+          );
+        } else if (
+          error instanceof Error
+        ) {
+          setSaveError(
+            error.message
+          );
+        } else {
+          setSaveError(
+            "The visit was saved, but could not be marked as completed."
+          );
+        }
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+  if (isLoading) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <Loader2 className="mx-auto h-7 w-7 animate-spin text-blue-600" />
+
+        <p className="mt-4 font-semibold text-slate-900">
+          Loading consultation...
+        </p>
+      </div>
     );
+  }
 
-    /*
-      Backend phase:
-      POST/PUT visit here.
-    */
+  if (loadError) {
+    return (
+      <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+        <h1 className="text-xl font-semibold text-slate-900">
+          Unable to open consultation
+        </h1>
 
-    navigate("/visits");
-  };
+        <p className="mt-2 text-sm text-slate-500">
+          {loadError}
+        </p>
+
+        <div className="mt-6">
+          <AppButton
+            onClick={() =>
+              navigate("/visits")
+            }
+          >
+            Back to Visits
+          </AppButton>
+        </div>
+      </div>
+    );
+  }
 
   const inputClass =
     "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-50";
@@ -275,6 +921,9 @@ export default function Consultation() {
   const labelClass =
     "mb-2 block text-sm font-medium text-slate-700";
 
+  const isExistingVisit =
+    currentVisitId !== null;
+
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       {/* Header */}
@@ -283,10 +932,11 @@ export default function Consultation() {
         <div className="flex items-start gap-4">
           <button
             type="button"
+            disabled={isSaving}
             onClick={() =>
               navigate("/visits")
             }
-            className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -298,7 +948,7 @@ export default function Consultation() {
             </div>
 
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-              {existingVisit
+              {isExistingVisit
                 ? "Continue Consultation"
                 : "New Consultation"}
             </h1>
@@ -313,26 +963,56 @@ export default function Consultation() {
         <div className="flex flex-wrap gap-3">
           <AppButton
             variant="secondary"
-            onClick={() =>
-              navigate("/visits")
+            disabled={isSaving}
+            onClick={
+              handleSaveDraft
             }
             leftIcon={
-              <Save className="h-4 w-4" />
+              isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )
             }
           >
-            Save Draft
+            {isSaving
+              ? "Saving..."
+              : "Save Draft"}
           </AppButton>
 
           <AppButton
-            onClick={handleComplete}
+            disabled={isSaving}
+            onClick={
+              handleComplete
+            }
             leftIcon={
-              <ClipboardCheck className="h-4 w-4" />
+              isSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ClipboardCheck className="h-4 w-4" />
+              )
             }
           >
-            Complete Visit
+            {isSaving
+              ? "Saving..."
+              : "Complete Visit"}
           </AppButton>
         </div>
       </div>
+
+      {/* Messages */}
+
+      {saveError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
+          {saveError}
+        </div>
+      )}
+
+      {saveMessage && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm font-medium text-emerald-700">
+          {saveMessage}
+        </div>
+      )}
 
       {/* Patient */}
 
@@ -355,9 +1035,12 @@ export default function Consultation() {
 
           <select
             value={form.patientId}
-            disabled={Boolean(
-              existingVisit
-            )}
+            disabled={
+              isExistingVisit ||
+              Boolean(
+                requestedPatientId
+              )
+            }
             onChange={(event) =>
               updateField(
                 "patientId",
@@ -365,7 +1048,8 @@ export default function Consultation() {
               )
             }
             className={`${inputClass} ${
-              existingVisit
+              isExistingVisit ||
+              requestedPatientId
                 ? "cursor-not-allowed bg-slate-50"
                 : ""
             }`}
@@ -424,6 +1108,33 @@ export default function Consultation() {
               </span>
             </div>
           )}
+
+          <div className="mt-5">
+            <label className={labelClass}>
+              Doctor{" "}
+              <span className="text-red-500">
+                *
+              </span>
+            </label>
+
+            <input
+              value={form.doctor}
+              onChange={(event) =>
+                updateField(
+                  "doctor",
+                  event.target.value
+                )
+              }
+              placeholder="Doctor name"
+              className={inputClass}
+            />
+
+            {errors.doctor && (
+              <p className="mt-2 text-xs text-red-600">
+                {errors.doctor}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
@@ -555,6 +1266,7 @@ export default function Consultation() {
           <AppButton
             type="button"
             variant="secondary"
+            disabled={isSaving}
             onClick={addMedicine}
             leftIcon={
               <Plus className="h-4 w-4" />
@@ -579,12 +1291,13 @@ export default function Consultation() {
 
                   <button
                     type="button"
+                    disabled={isSaving}
                     onClick={() =>
                       removeMedicine(
                         medicine.id
                       )
                     }
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -820,6 +1533,7 @@ export default function Consultation() {
               value={
                 form.followUpDate
               }
+              min={getLocalDateString()}
               onChange={(event) =>
                 updateField(
                   "followUpDate",
@@ -830,29 +1544,56 @@ export default function Consultation() {
                 inputClass
               }
             />
+
+            {errors.followUpDate && (
+              <p className="mt-2 text-xs text-red-600">
+                {
+                  errors.followUpDate
+                }
+              </p>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Bottom */}
+      {/* Bottom Actions */}
 
       <div className="flex flex-col-reverse gap-3 pb-6 sm:flex-row sm:justify-end">
         <AppButton
           variant="secondary"
-          onClick={() =>
-            navigate("/visits")
+          disabled={isSaving}
+          onClick={
+            handleSaveDraft
+          }
+          leftIcon={
+            isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )
           }
         >
-          Save Draft
+          {isSaving
+            ? "Saving..."
+            : "Save Draft"}
         </AppButton>
 
         <AppButton
-          onClick={handleComplete}
+          disabled={isSaving}
+          onClick={
+            handleComplete
+          }
           leftIcon={
-            <ClipboardCheck className="h-4 w-4" />
+            isSaving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ClipboardCheck className="h-4 w-4" />
+            )
           }
         >
-          Complete Visit
+          {isSaving
+            ? "Saving..."
+            : "Complete Visit"}
         </AppButton>
       </div>
     </div>
@@ -887,4 +1628,90 @@ function SectionHeader({
       </div>
     </div>
   );
+}
+
+function cleanValue(
+  value: string
+) {
+  const trimmed =
+    value.trim();
+
+  return trimmed
+    ? trimmed
+    : null;
+}
+
+function getLocalDateString() {
+  const today = new Date();
+
+  const year =
+    today.getFullYear();
+
+  const month = String(
+    today.getMonth() + 1
+  ).padStart(2, "0");
+
+  const day = String(
+    today.getDate()
+  ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalTimeString(
+  date: Date
+) {
+  const hours = String(
+    date.getHours()
+  ).padStart(2, "0");
+
+  const minutes = String(
+    date.getMinutes()
+  ).padStart(2, "0");
+
+  const seconds = String(
+    date.getSeconds()
+  ).padStart(2, "0");
+
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+async function readApiError(
+  response: Response
+) {
+  try {
+    const contentType =
+      response.headers.get(
+        "content-type"
+      );
+
+    if (
+      contentType?.includes(
+        "application/json"
+      )
+    ) {
+      const data =
+        await response.json();
+
+      if (
+        typeof data === "string"
+      ) {
+        return data;
+      }
+
+      if (data?.message) {
+        return data.message;
+      }
+
+      if (data?.title) {
+        return data.title;
+      }
+
+      return "";
+    }
+
+    return await response.text();
+  } catch {
+    return "";
+  }
 }

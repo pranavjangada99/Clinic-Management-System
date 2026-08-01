@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
   useNavigate,
@@ -13,9 +17,36 @@ import {
 
 import AppButton from "@/components/ui/app/AppButton";
 
-import { bills } from "@/features/billing/data/bills";
-
 import type { PaymentMethod } from "./types";
+
+interface Bill {
+  id: number;
+  billNumber: string;
+
+  patientId: number;
+  patientName: string;
+  patientUhid: string;
+  patientMobile: string;
+
+  billDate: string;
+
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
+  balance: number;
+
+  status:
+    | "Paid"
+    | "Partially Paid"
+    | "Unpaid";
+}
+
+const BILLS_API =
+  "http://localhost:5230/api/bills";
+
+const PAYMENTS_API =
+  "http://localhost:5230/api/payments";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -29,30 +60,14 @@ export default function RecordPayment() {
   const requestedBillId =
     searchParams.get("billId") ?? "";
 
-  const initialBillId = bills.some(
-    (bill) =>
-      String(bill.id) === requestedBillId &&
-      bill.balance > 0
-  )
-    ? requestedBillId
-    : "";
+  const [bills, setBills] =
+    useState<Bill[]>([]);
 
   const [billId, setBillId] =
-    useState(initialBillId);
-
-  const selectedBill = useMemo(
-    () =>
-      bills.find(
-        (bill) =>
-          String(bill.id) === billId
-      ),
-    [billId]
-  );
+    useState("");
 
   const [amount, setAmount] =
-    useState(
-      selectedBill?.balance ?? 0
-    );
+    useState(0);
 
   const [method, setMethod] =
     useState<PaymentMethod>("Cash");
@@ -66,53 +81,231 @@ export default function RecordPayment() {
   const [error, setError] =
     useState("");
 
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
+
+  const [
+    isSaving,
+    setIsSaving,
+  ] = useState(false);
+
+  /*
+   * Load real bills
+   */
+
+  useEffect(() => {
+    const loadBills = async () => {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        const response =
+          await fetch(BILLS_API);
+
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load bills."
+          );
+        }
+
+        const data: Bill[] =
+          await response.json();
+
+        setBills(data);
+
+        /*
+         * If we came here from
+         * Bill Details, automatically
+         * select that bill.
+         */
+
+        const requestedBill =
+          data.find(
+            (bill) =>
+              String(bill.id) ===
+                requestedBillId &&
+              bill.balance > 0
+          );
+
+        if (requestedBill) {
+          setBillId(
+            String(
+              requestedBill.id
+            )
+          );
+
+          setAmount(
+            requestedBill.balance
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load bills:",
+          error
+        );
+
+        setError(
+          "Unable to load outstanding bills. Make sure the clinic server is running."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBills();
+  }, [requestedBillId]);
+
+  /*
+   * Only bills with money
+   * still outstanding.
+   */
+
+  const outstandingBills =
+    useMemo(
+      () =>
+        bills.filter(
+          (bill) =>
+            bill.balance > 0
+        ),
+      [bills]
+    );
+
+  const selectedBill =
+    useMemo(
+      () =>
+        bills.find(
+          (bill) =>
+            String(bill.id) ===
+            billId
+        ),
+      [bills, billId]
+    );
+
+  /*
+   * Bill selection
+   */
+
   const handleBillChange = (
     value: string
   ) => {
     setBillId(value);
 
-    const bill = bills.find(
-      (item) =>
-        String(item.id) === value
+    const bill =
+      bills.find(
+        (item) =>
+          String(item.id) === value
+      );
+
+    setAmount(
+      bill?.balance ?? 0
     );
 
-    setAmount(bill?.balance ?? 0);
     setError("");
   };
 
-  const handleSave = () => {
-    if (!selectedBill) {
-      setError(
-        "Please select an outstanding bill."
-      );
-      return;
-    }
+  /*
+   * Save real payment
+   */
 
-    if (
-      amount <= 0 ||
-      amount > selectedBill.balance
-    ) {
-      setError(
-        `Payment must be between ₹1 and ${currency(
+  const handleSave =
+    async () => {
+      if (!selectedBill) {
+        setError(
+          "Please select an outstanding bill."
+        );
+
+        return;
+      }
+
+      if (
+        amount <= 0 ||
+        amount >
           selectedBill.balance
-        )}.`
-      );
-      return;
-    }
+      ) {
+        setError(
+          `Payment must be greater than ₹0 and cannot exceed ${currency(
+            selectedBill.balance
+          )}.`
+        );
 
-    console.log("Payment ready:", {
-      bill: selectedBill,
-      amount,
-      method,
-      reference,
-      notes,
-    });
+        return;
+      }
 
-    navigate("/payments");
-  };
+      try {
+        setIsSaving(true);
+        setError("");
+
+        const response =
+          await fetch(
+            PAYMENTS_API,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                billId:
+                  selectedBill.id,
+
+                amount,
+
+                method,
+
+                reference:
+                  reference.trim() ||
+                  null,
+
+                notes:
+                  notes.trim() ||
+                  null,
+              }),
+            }
+          );
+
+        if (!response.ok) {
+          const message =
+            await response.text();
+
+          throw new Error(
+            message ||
+              "Unable to save payment."
+          );
+        }
+
+        /*
+         * Payment saved.
+         *
+         * Return to the bill so
+         * user immediately sees
+         * updated Paid / Balance.
+         */
+
+        navigate(
+          `/billing/${selectedBill.id}`
+        );
+      } catch (error) {
+        console.error(
+          "Failed to save payment:",
+          error
+        );
+
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Unable to save payment."
+        );
+      } finally {
+        setIsSaving(false);
+      }
+    };
 
   const inputClass =
-    "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50";
+    "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
 
   const labelClass =
     "mb-2 block text-sm font-medium text-slate-700";
@@ -124,10 +317,19 @@ export default function RecordPayment() {
       <div className="flex items-start gap-4">
         <button
           type="button"
-          onClick={() =>
-            navigate("/payments")
-          }
-          className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600"
+          onClick={() => {
+            if (requestedBillId) {
+              navigate(
+                `/billing/${requestedBillId}`
+              );
+            } else {
+              navigate(
+                "/payments"
+              );
+            }
+          }}
+          className="mt-1 flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          aria-label="Back"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -143,128 +345,193 @@ export default function RecordPayment() {
           </h1>
 
           <p className="mt-1 text-slate-500">
-            Record payment against an outstanding bill.
+            Record payment against
+            an outstanding bill.
           </p>
         </div>
       </div>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="grid gap-5 md:grid-cols-2">
+          {/* Bill */}
+
           <div className="md:col-span-2">
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Bill *
             </label>
 
             <select
               value={billId}
+              disabled={
+                isLoading ||
+                isSaving
+              }
               onChange={(event) =>
                 handleBillChange(
                   event.target.value
                 )
               }
-              className={inputClass}
+              className={
+                inputClass
+              }
             >
               <option value="">
-                Select outstanding bill
+                {isLoading
+                  ? "Loading bills..."
+                  : "Select outstanding bill"}
               </option>
 
-              {bills
-                .filter(
-                  (bill) =>
-                    bill.balance > 0
-                )
-                .map((bill) => (
+              {outstandingBills.map(
+                (bill) => (
                   <option
-                    key={bill.id}
-                    value={bill.id}
+                    key={
+                      bill.id
+                    }
+                    value={
+                      bill.id
+                    }
                   >
-                    {bill.billNumber} —{" "}
-                    {bill.patientName} — Balance{" "}
-                    {currency(bill.balance)}
+                    {
+                      bill.billNumber
+                    }{" "}
+                    —{" "}
+                    {
+                      bill.patientName
+                    }{" "}
+                    — Balance{" "}
+                    {currency(
+                      bill.balance
+                    )}
                   </option>
-                ))}
+                )
+              )}
             </select>
+
+            {!isLoading &&
+              outstandingBills.length ===
+                0 && (
+                <p className="mt-2 text-sm text-slate-500">
+                  There are currently
+                  no outstanding bills.
+                </p>
+              )}
           </div>
+
+          {/* Selected Bill */}
 
           {selectedBill && (
             <div className="md:col-span-2 rounded-2xl bg-blue-50/60 p-4">
               <p className="font-semibold text-slate-900">
-                {selectedBill.patientName}
+                {
+                  selectedBill.patientName
+                }
               </p>
 
               <p className="mt-1 text-sm text-slate-500">
-                {selectedBill.uhid} •{" "}
-                {selectedBill.billNumber}
+                {
+                  selectedBill.patientUhid
+                }{" "}
+                •{" "}
+                {
+                  selectedBill.billNumber
+                }
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-6 text-sm">
-                <span>
-                  Total:{" "}
-                  <strong>
-                    {currency(
-                      selectedBill.total
-                    )}
-                  </strong>
-                </span>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <AmountCard
+                  label="Total"
+                  value={currency(
+                    selectedBill.total
+                  )}
+                />
 
-                <span>
-                  Paid:{" "}
-                  <strong>
-                    {currency(
-                      selectedBill.paid
-                    )}
-                  </strong>
-                </span>
+                <AmountCard
+                  label="Already Paid"
+                  value={currency(
+                    selectedBill.paid
+                  )}
+                />
 
-                <span>
-                  Balance:{" "}
-                  <strong className="text-red-600">
-                    {currency(
-                      selectedBill.balance
-                    )}
-                  </strong>
-                </span>
+                <AmountCard
+                  label="Balance"
+                  value={currency(
+                    selectedBill.balance
+                  )}
+                  highlight
+                />
               </div>
             </div>
           )}
 
+          {/* Amount */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Amount *
             </label>
 
             <input
               type="number"
-              min="1"
+              min="0.01"
+              step="0.01"
               max={
                 selectedBill?.balance
               }
               value={amount}
-              onChange={(event) =>
+              disabled={
+                !selectedBill ||
+                isSaving
+              }
+              onChange={(event) => {
                 setAmount(
                   Number(
-                    event.target.value
+                    event.target
+                      .value
                   ) || 0
-                )
+                );
+
+                setError("");
+              }}
+              className={
+                inputClass
               }
-              className={inputClass}
             />
+
+            {selectedBill && (
+              <p className="mt-2 text-xs text-slate-400">
+                Maximum payment:{" "}
+                {currency(
+                  selectedBill.balance
+                )}
+              </p>
+            )}
           </div>
 
+          {/* Method */}
+
           <div>
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Payment Method
             </label>
 
             <select
               value={method}
+              disabled={isSaving}
               onChange={(event) =>
                 setMethod(
                   event.target
                     .value as PaymentMethod
                 )
               }
-              className={inputClass}
+              className={
+                inputClass
+              }
             >
               <option value="Cash">
                 Cash
@@ -284,30 +551,47 @@ export default function RecordPayment() {
             </select>
           </div>
 
+          {/* Reference */}
+
           <div className="md:col-span-2">
-            <label className={labelClass}>
-              Transaction / Reference
+            <label
+              className={labelClass}
+            >
+              Transaction /
+              Reference
             </label>
 
             <input
               value={reference}
+              disabled={isSaving}
               onChange={(event) =>
                 setReference(
                   event.target.value
                 )
               }
-              placeholder="Optional transaction reference"
-              className={inputClass}
+              placeholder={
+                method === "Cash"
+                  ? "Optional"
+                  : "UPI / card / bank transaction reference"
+              }
+              className={
+                inputClass
+              }
             />
           </div>
 
+          {/* Notes */}
+
           <div className="md:col-span-2">
-            <label className={labelClass}>
+            <label
+              className={labelClass}
+            >
               Notes
             </label>
 
             <textarea
               value={notes}
+              disabled={isSaving}
               onChange={(event) =>
                 setNotes(
                   event.target.value
@@ -315,28 +599,69 @@ export default function RecordPayment() {
               }
               rows={4}
               placeholder="Optional payment notes..."
-              className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-50"
+              className="w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-50 disabled:cursor-not-allowed disabled:bg-slate-50"
             />
           </div>
         </div>
 
+        {/* Error */}
+
         {error && (
-          <p className="mt-4 text-sm text-red-600">
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
             {error}
-          </p>
+          </div>
         )}
+
+        {/* Save */}
 
         <div className="mt-6 flex justify-end">
           <AppButton
-            onClick={handleSave}
+            onClick={
+              handleSave
+            }
+            disabled={
+              isLoading ||
+              isSaving ||
+              !selectedBill
+            }
             leftIcon={
               <Save className="h-4 w-4" />
             }
           >
-            Save Payment
+            {isSaving
+              ? "Saving..."
+              : "Save Payment"}
           </AppButton>
         </div>
       </section>
+    </div>
+  );
+}
+
+function AmountCard({
+  label,
+  value,
+  highlight = false,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-3 shadow-sm">
+      <p className="text-xs text-slate-400">
+        {label}
+      </p>
+
+      <p
+        className={`mt-1 font-bold ${
+          highlight
+            ? "text-red-600"
+            : "text-slate-900"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
