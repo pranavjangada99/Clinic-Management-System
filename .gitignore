@@ -1,1 +1,8 @@
+# Clinic database - NEVER commit patient data
+backend/clinic.db
+backend/clinic.db-shm
+backend/clinic.db-wal
 
+# Backend build files
+backend/bin/
+backend/obj/
