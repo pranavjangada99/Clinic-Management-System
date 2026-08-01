@@ -1,5 +1,6 @@
 import AppButton from "@/components/ui/app/AppButton";
 import { dashboardData } from "@/data/dashboard";
+
 import {
   CalendarDays,
   CalendarPlus,
@@ -7,6 +8,8 @@ import {
   FileText,
   UserPlus,
 } from "lucide-react";
+
+import { useNavigate } from "react-router-dom";
 
 const iconColors: Record<string, string> = {
   blue: "bg-blue-50 text-blue-600",
@@ -16,6 +19,8 @@ const iconColors: Record<string, string> = {
 };
 
 export default function HeroSection() {
+  const navigate = useNavigate();
+
   return (
     <section className="relative overflow-hidden rounded-[32px] border border-slate-200/70 bg-gradient-to-br from-white via-white to-slate-50 p-8 shadow-sm">
       {/* Background Glow */}
@@ -29,6 +34,7 @@ export default function HeroSection() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500">
               <CalendarDays className="h-4 w-4" />
+
               Friday • 31 July 2026
             </div>
 
@@ -47,30 +53,50 @@ export default function HeroSection() {
             </p>
           </div>
 
-          {/* Actions */}
+          {/* Quick Actions */}
 
           <div className="flex flex-wrap gap-3">
-            <AppButton leftIcon={<UserPlus className="h-5 w-5" />}>
+            <AppButton
+              onClick={() => navigate("/patients/add")}
+              leftIcon={
+                <UserPlus className="h-5 w-5" />
+              }
+            >
               Add Patient
             </AppButton>
 
             <AppButton
               variant="secondary"
-              leftIcon={<CalendarPlus className="h-5 w-5" />}
+              onClick={() =>
+                navigate("/appointments/add")
+              }
+              leftIcon={
+                <CalendarPlus className="h-5 w-5" />
+              }
             >
               Appointment
             </AppButton>
 
             <AppButton
               variant="secondary"
-              leftIcon={<CreditCard className="h-5 w-5" />}
+              onClick={() =>
+                navigate("/payments/new")
+              }
+              leftIcon={
+                <CreditCard className="h-5 w-5" />
+              }
             >
               Payment
             </AppButton>
 
             <AppButton
               variant="secondary"
-              leftIcon={<FileText className="h-5 w-5" />}
+              onClick={() =>
+                navigate("/visits")
+              }
+              leftIcon={
+                <FileText className="h-5 w-5" />
+              }
             >
               Prescription
             </AppButton>
@@ -91,7 +117,8 @@ export default function HeroSection() {
                 <div className="flex items-center justify-between">
                   <div
                     className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                      iconColors[item.color] ?? "bg-slate-100 text-slate-700"
+                      iconColors[item.color] ??
+                      "bg-slate-100 text-slate-700"
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -102,7 +129,9 @@ export default function HeroSection() {
                   </span>
                 </div>
 
-                <p className="mt-5 text-sm text-slate-500">{item.title}</p>
+                <p className="mt-5 text-sm text-slate-500">
+                  {item.title}
+                </p>
 
                 <h3 className="mt-1 text-3xl font-bold text-slate-900">
                   {item.value}

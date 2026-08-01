@@ -29,15 +29,13 @@ export default function WaitingQueue() {
         {dashboardData.waitingQueue.map((patient, index) => (
           <div
             key={patient.id}
-            className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-blue-200 hover:shadow-md"
+            className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-blue-200 hover:shadow-md"
           >
             <div className="flex items-center gap-4">
-              {/* Avatar */}
-
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
                 {patient.name
                   .split(" ")
-                  .map((n) => n[0])
+                  .map((name) => name[0])
                   .join("")}
               </div>
 
@@ -55,7 +53,8 @@ export default function WaitingQueue() {
             <div className="text-right">
               <span
                 className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  priorityStyles[patient.priority]
+                  priorityStyles[patient.priority] ??
+                  "bg-slate-100 text-slate-600"
                 }`}
               >
                 {patient.priority}

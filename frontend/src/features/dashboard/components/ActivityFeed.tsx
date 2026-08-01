@@ -21,12 +21,7 @@ export default function ActivityFeed() {
 
       <div className="space-y-6">
         {dashboardData.activity.map((item, index) => (
-          <div
-            key={item.id}
-            className="relative flex gap-4"
-          >
-            {/* Timeline */}
-
+          <div key={item.id} className="relative flex gap-4">
             <div className="flex flex-col items-center">
               <div className="h-3 w-3 rounded-full bg-blue-600" />
 
@@ -35,15 +30,13 @@ export default function ActivityFeed() {
               )}
             </div>
 
-            {/* Content */}
-
             <div className="flex-1 rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:shadow-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-4">
                 <h3 className="font-semibold text-slate-900">
                   {item.title}
                 </h3>
 
-                <span className="text-xs text-slate-400">
+                <span className="shrink-0 text-xs text-slate-400">
                   {item.time}
                 </span>
               </div>
