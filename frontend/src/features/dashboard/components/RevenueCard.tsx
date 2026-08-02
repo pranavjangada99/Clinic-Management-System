@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useMemo,
@@ -34,7 +35,7 @@ interface RevenueDay {
 }
 
 const API_URL =
-  "http://localhost:5230/api/payments";
+  "/payments";
 
 export default function RevenueCard() {
   const [payments, setPayments] =
@@ -52,7 +53,7 @@ export default function RevenueCard() {
     const loadPayments = async () => {
       try {
         const response =
-          await fetch(API_URL);
+          await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error(

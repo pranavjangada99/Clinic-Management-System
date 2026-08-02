@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   useNavigate,
@@ -29,10 +30,10 @@ interface Patient {
 }
 
 const PATIENTS_API =
-  "http://localhost:5230/api/patients";
+  "/patients";
 
 const BILLS_API =
-  "http://localhost:5230/api/bills";
+  "/bills";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -129,7 +130,7 @@ export default function CreateBill() {
           setPatientLoadError("");
 
           const response =
-            await fetch(
+            await apiFetch(
               PATIENTS_API
             );
 
@@ -382,7 +383,7 @@ export default function CreateBill() {
         setSaveError("");
 
         const response =
-          await fetch(
+          await apiFetch(
             BILLS_API,
             {
               method: "POST",

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -31,7 +32,7 @@ interface Appointment {
 
 type Filter = "All" | AppointmentStatus;
 
-const API_URL = "http://localhost:5230/api/appointments";
+const API_URL = "/appointments";
 
 const filters: Filter[] = [
   "All",
@@ -68,7 +69,7 @@ export default function Appointments() {
       setIsLoading(true);
       setLoadError("");
 
-      const response = await fetch(API_URL);
+      const response = await apiFetch(API_URL);
 
       if (!response.ok) {
         throw new Error("Unable to load appointments.");
@@ -93,7 +94,7 @@ export default function Appointments() {
 
     const fetchAppointments = async () => {
       try {
-        const response = await fetch(API_URL);
+        const response = await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error("Unable to load appointments.");

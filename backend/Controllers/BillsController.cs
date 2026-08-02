@@ -20,16 +20,28 @@ public class BillsController : ControllerBase
     }
 
     // GET: api/bills
+
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<BillResponseDto>>> GetBills()
+    public async Task<
+        ActionResult<IEnumerable<BillResponseDto>>
+    > GetBills()
     {
-        var bills = await _context.Bills
-            .AsNoTracking()
-            .Include(bill => bill.Patient)
-            .Include(bill => bill.Items)
-            .OrderByDescending(bill => bill.BillDate)
-            .ThenByDescending(bill => bill.Id)
-            .ToListAsync();
+        var bills =
+            await _context.Bills
+                .AsNoTracking()
+                .Include(
+                    bill => bill.Patient
+                )
+                .Include(
+                    bill => bill.Items
+                )
+                .OrderByDescending(
+                    bill => bill.BillDate
+                )
+                .ThenByDescending(
+                    bill => bill.Id
+                )
+                .ToListAsync();
 
         return Ok(
             bills.Select(ToResponseDto)
@@ -37,18 +49,25 @@ public class BillsController : ControllerBase
     }
 
     // GET: api/bills/1
+
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<BillResponseDto>> GetBill(
-        int id
-    )
+    public async Task<
+        ActionResult<BillResponseDto>
+    > GetBill(int id)
     {
-        var bill = await _context.Bills
-            .AsNoTracking()
-            .Include(bill => bill.Patient)
-            .Include(bill => bill.Items)
-            .FirstOrDefaultAsync(
-                bill => bill.Id == id
-            );
+        var bill =
+            await _context.Bills
+                .AsNoTracking()
+                .Include(
+                    bill => bill.Patient
+                )
+                .Include(
+                    bill => bill.Items
+                )
+                .FirstOrDefaultAsync(
+                    bill =>
+                        bill.Id == id
+                );
 
         if (bill == null)
         {
@@ -61,8 +80,11 @@ public class BillsController : ControllerBase
     }
 
     // POST: api/bills
+
     [HttpPost]
-    public async Task<ActionResult<BillResponseDto>> CreateBill(
+    public async Task<
+        ActionResult<BillResponseDto>
+    > CreateBill(
         CreateBillDto dto
     )
     {
@@ -112,7 +134,10 @@ public class BillsController : ControllerBase
                     item.Rate
             );
 
-        if (dto.Discount > subtotal)
+        if (
+            dto.Discount >
+            subtotal
+        )
         {
             return BadRequest(
                 "Discount cannot be greater than subtotal."
@@ -144,121 +169,172 @@ public class BillsController : ControllerBase
         var billNumber =
             await GenerateBillNumber();
 
-        var bill = new Bill
-        {
-            BillNumber =
-                billNumber,
+        var bill =
+            new Bill
+            {
+                BillNumber =
+                    billNumber,
 
-            PatientId =
-                patient.Id,
+                PatientId =
+                    patient.Id,
 
-            Patient =
-                patient,
+                Patient =
+                    patient,
 
-            BillDate =
-                dto.BillDate,
+                BillDate =
+                    dto.BillDate,
 
-            Subtotal =
-                subtotal,
+                Subtotal =
+                    subtotal,
 
-            Discount =
-                dto.Discount,
+                Discount =
+                    dto.Discount,
 
-            Total =
-                total,
+                Total =
+                    total,
 
-            Paid =
-                dto.Paid,
+                Paid =
+                    dto.Paid,
 
-            Balance =
-                balance,
+                Balance =
+                    balance,
 
-            Status =
-                status,
+                Status =
+                    status,
 
-            CreatedAt =
-                DateTime.UtcNow,
+                CreatedAt =
+                    DateTime.UtcNow,
 
-            UpdatedAt =
-                DateTime.UtcNow,
+                UpdatedAt =
+                    DateTime.UtcNow,
 
-            Items =
-                dto.Items.Select(
-                    item =>
-                        new BillItem
-                        {
-                            Description =
-                                item.Description.Trim(),
+                Items =
+                    dto.Items
+                        .Select(
+                            item =>
+                                new BillItem
+                                {
+                                    Description =
+                                        item.Description
+                                            .Trim(),
 
-                            Quantity =
-                                item.Quantity,
+                                    Quantity =
+                                        item.Quantity,
 
-                            Rate =
-                                item.Rate
-                        }
-                ).ToList()
-        };
+                                    Rate =
+                                        item.Rate
+                                }
+                        )
+                        .ToList()
+            };
 
-        _context.Bills.Add(bill);
+        _context.Bills.Add(
+            bill
+        );
 
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(
             nameof(GetBill),
-            new { id = bill.Id },
+            new
+            {
+                id = bill.Id
+            },
             ToResponseDto(bill)
         );
     }
 
-    private async Task<string> GenerateBillNumber()
+    // ---------------------------------
+    // Generate invoice number
+    // ---------------------------------
+
+    private async Task<string>
+        GenerateBillNumber()
     {
+        var settings =
+            await _context.ClinicSettings
+                .FirstOrDefaultAsync();
+
         var year =
             DateTime.Today.Year;
 
         var prefix =
-            $"INV-{year}-";
+            string.IsNullOrWhiteSpace(
+                settings?.InvoicePrefix
+            )
+                ? $"INV-{year}"
+                : settings
+                    .InvoicePrefix
+                    .Trim();
 
-        var lastBill =
+        var prefixWithSeparator =
+            $"{prefix}-";
+
+        var existingNumbers =
             await _context.Bills
                 .AsNoTracking()
                 .Where(
                     bill =>
-                        bill.BillNumber.StartsWith(
-                            prefix
-                        )
+                        bill.BillNumber
+                            .StartsWith(
+                                prefixWithSeparator
+                            )
                 )
-                .OrderByDescending(
-                    bill => bill.Id
+                .Select(
+                    bill =>
+                        bill.BillNumber
                 )
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-        var nextNumber = 1;
+        var highestExistingNumber =
+            0;
 
-        if (
-            lastBill != null &&
-            lastBill.BillNumber.Length >
-            prefix.Length
+        foreach (
+            var billNumber
+            in existingNumbers
         )
         {
             var numberPart =
-                lastBill.BillNumber[
-                    prefix.Length..
+                billNumber[
+                    prefixWithSeparator.Length..
                 ];
 
             if (
                 int.TryParse(
                     numberPart,
-                    out var previousNumber
+                    out var number
                 )
             )
             {
-                nextNumber =
-                    previousNumber + 1;
+                highestExistingNumber =
+                    Math.Max(
+                        highestExistingNumber,
+                        number
+                    );
             }
         }
 
+        var configuredNext =
+            settings?.NextInvoiceNumber
+            ?? 1;
+
+        var nextNumber =
+            Math.Max(
+                configuredNext,
+                highestExistingNumber + 1
+            );
+
+        if (settings != null)
+        {
+            settings.NextInvoiceNumber =
+                nextNumber + 1;
+
+            settings.UpdatedAt =
+                DateTime.UtcNow;
+        }
+
         return
-            $"{prefix}{nextNumber:D4}";
+            $"{prefix}-{nextNumber:D4}";
     }
 
     private static string CalculateStatus(
@@ -283,9 +359,10 @@ public class BillsController : ControllerBase
         return "Unpaid";
     }
 
-    private static BillResponseDto ToResponseDto(
-        Bill bill
-    )
+    private static BillResponseDto
+        ToResponseDto(
+            Bill bill
+        )
     {
         return new BillResponseDto
         {

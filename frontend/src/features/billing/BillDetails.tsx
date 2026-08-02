@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import {
   useNavigate,
@@ -43,7 +44,7 @@ interface Bill {
 }
 
 const API_URL =
-  "http://localhost:5230/api/bills";
+  "/bills";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -80,7 +81,7 @@ export default function BillDetails() {
         setLoadError("");
 
         const response =
-          await fetch(
+          await apiFetch(
             `${API_URL}/${billId}`
           );
 

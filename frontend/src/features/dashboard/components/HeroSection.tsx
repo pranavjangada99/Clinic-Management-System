@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useState,
@@ -15,12 +16,19 @@ import {
   Users,
 } from "lucide-react";
 
-import { useNavigate } from "react-router-dom";
+import {
+  useNavigate,
+} from "react-router-dom";
 
 import AppButton from "@/components/ui/app/AppButton";
 
+import {
+  useAuth,
+} from "@/features/auth/AuthContext";
+
 interface Visit {
   id: number;
+  patientId: number;
   visitDate: string;
   status: string;
 }
@@ -37,6 +45,10 @@ interface Payment {
   amount: number;
 }
 
+interface ClinicSettings {
+  clinicName: string;
+}
+
 interface SummaryItem {
   title: string;
   value: string;
@@ -45,165 +57,280 @@ interface SummaryItem {
 }
 
 const VISITS_API =
-  "http://localhost:5230/api/visits";
+  "/visits";
 
 const APPOINTMENTS_API =
-  "http://localhost:5230/api/appointments";
+  "/appointments";
 
 const PAYMENTS_API =
-  "http://localhost:5230/api/payments";
+  "/payments";
+
+const SETTINGS_API =
+  "/clinic-settings";
 
 const iconColors: Record<
   string,
   string
 > = {
-  blue: "bg-blue-50 text-blue-600",
+  blue:
+    "bg-blue-50 text-blue-600",
+
   amber:
     "bg-amber-50 text-amber-600",
+
   emerald:
     "bg-emerald-50 text-emerald-600",
+
   violet:
     "bg-violet-50 text-violet-600",
 };
 
 export default function HeroSection() {
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
-  const [summary, setSummary] =
-    useState<SummaryItem[]>([]);
+  const {
+    user,
+  } = useAuth();
 
-  const [isLoading, setIsLoading] =
-    useState(true);
+  const [
+    clinicName,
+    setClinicName,
+  ] = useState(
+    "Clinic"
+  );
 
-  const [loadError, setLoadError] =
-    useState("");
+  const [
+    summary,
+    setSummary,
+  ] =
+    useState<
+      SummaryItem[]
+    >([]);
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
+
+  const [
+    loadError,
+    setLoadError,
+  ] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
+    let cancelled =
+      false;
 
-    const loadDashboard = async () => {
-      try {
-        const [
-          visitsResponse,
-          appointmentsResponse,
-          paymentsResponse,
-        ] = await Promise.all([
-          fetch(VISITS_API),
-          fetch(APPOINTMENTS_API),
-          fetch(PAYMENTS_API),
-        ]);
+    const loadDashboard =
+      async () => {
+        try {
+          const [
+            visitsResponse,
+            appointmentsResponse,
+            paymentsResponse,
+            settingsResponse,
+          ] =
+            await Promise.all([
+              apiFetch(
+                VISITS_API
+              ),
 
-        if (
-          !visitsResponse.ok ||
-          !appointmentsResponse.ok ||
-          !paymentsResponse.ok
-        ) {
-          throw new Error(
-            "Unable to load dashboard."
-          );
-        }
+              apiFetch(
+                APPOINTMENTS_API
+              ),
 
-        const visits: Visit[] =
-          await visitsResponse.json();
+              apiFetch(
+                PAYMENTS_API
+              ),
 
-        const appointments: Appointment[] =
-          await appointmentsResponse.json();
+              apiFetch(
+                SETTINGS_API
+              ),
+            ]);
 
-        const payments: Payment[] =
-          await paymentsResponse.json();
+          if (
+            !visitsResponse.ok ||
+            !appointmentsResponse.ok ||
+            !paymentsResponse.ok ||
+            !settingsResponse.ok
+          ) {
+            throw new Error(
+              "Unable to load dashboard."
+            );
+          }
 
-        const today =
-          getLocalDateString();
+          const visits:
+            Visit[] =
+            await visitsResponse.json();
 
-        const todaysVisits =
-          visits.filter(
-            (visit) =>
-              visit.visitDate === today
-          );
+          const appointments:
+            Appointment[] =
+            await appointmentsResponse.json();
 
-        const patientsToday =
-          new Set(
-            todaysVisits.map(
-              (visit) => visit.id
-            )
-          ).size;
+          const payments:
+            Payment[] =
+            await paymentsResponse.json();
 
-        const waiting =
-          todaysVisits.filter(
-            (visit) =>
-              visit.status === "Waiting"
-          ).length;
+          const settings:
+            ClinicSettings =
+            await settingsResponse.json();
 
-        const followUps =
-          appointments.filter(
-            (appointment) =>
-              appointment.appointmentDate ===
-                today &&
-              appointment.type ===
-                "Follow-up"
-          ).length;
+          const today =
+            getLocalDateString();
 
-        const revenue =
-          payments
-            .filter(
-              (payment) =>
-                payment.paymentDate.startsWith(today)
-            )
-            .reduce(
-              (sum, payment) =>
-                sum + payment.amount,
-              0
+          const todaysVisits =
+            visits.filter(
+              (visit) =>
+                visit.visitDate ===
+                today
             );
 
-        const items: SummaryItem[] = [
-          {
-            title: "Patients Today",
-            value: String(
-              patientsToday
-            ),
-            icon: Users,
-            color: "blue",
-          },
-          {
-            title: "Waiting",
-            value: String(waiting),
-            icon: Activity,
-            color: "amber",
-          },
-          {
-            title: "Revenue",
-            value: currency(revenue),
-            icon: IndianRupee,
-            color: "emerald",
-          },
-          {
-            title: "Follow-ups",
-            value: String(followUps),
-            icon: CalendarDays,
-            color: "violet",
-          },
-        ];
+          /*
+           * Unique patients seen /
+           * registered in today's
+           * visit queue.
+           */
+          const patientsToday =
+            new Set(
+              todaysVisits.map(
+                (visit) =>
+                  visit.patientId
+              )
+            ).size;
 
-        if (!cancelled) {
-          setSummary(items);
-        }
-      } catch (error) {
-        console.error(
-          "Failed to load dashboard:",
-          error
-        );
+          const waiting =
+            todaysVisits.filter(
+              (visit) =>
+                visit.status ===
+                "Waiting"
+            ).length;
 
-        if (!cancelled) {
-          setLoadError(
-            "Unable to load dashboard summary."
+          const followUps =
+            appointments.filter(
+              (
+                appointment
+              ) =>
+                appointment.appointmentDate ===
+                  today &&
+                appointment.type ===
+                  "Follow-up"
+            ).length;
+
+          const revenue =
+            payments
+              .filter(
+                (payment) =>
+                  payment.paymentDate.startsWith(
+                    today
+                  )
+              )
+              .reduce(
+                (
+                  sum,
+                  payment
+                ) =>
+                  sum +
+                  payment.amount,
+                0
+              );
+
+          const items:
+            SummaryItem[] =
+            [
+              {
+                title:
+                  "Patients Today",
+
+                value:
+                  String(
+                    patientsToday
+                  ),
+
+                icon: Users,
+
+                color:
+                  "blue",
+              },
+
+              {
+                title:
+                  "Waiting",
+
+                value:
+                  String(
+                    waiting
+                  ),
+
+                icon:
+                  Activity,
+
+                color:
+                  "amber",
+              },
+
+              {
+                title:
+                  "Revenue",
+
+                value:
+                  currency(
+                    revenue
+                  ),
+
+                icon:
+                  IndianRupee,
+
+                color:
+                  "emerald",
+              },
+
+              {
+                title:
+                  "Follow-ups",
+
+                value:
+                  String(
+                    followUps
+                  ),
+
+                icon:
+                  CalendarDays,
+
+                color:
+                  "violet",
+              },
+            ];
+
+          if (!cancelled) {
+            setSummary(
+              items
+            );
+
+            setClinicName(
+              settings.clinicName ||
+                "Clinic"
+            );
+          }
+        } catch (error) {
+          console.error(
+            "Failed to load dashboard:",
+            error
           );
+
+          if (!cancelled) {
+            setLoadError(
+              "Unable to load dashboard summary."
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setIsLoading(
+              false
+            );
+          }
         }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
+      };
 
     void loadDashboard();
 
@@ -216,14 +343,29 @@ export default function HeroSection() {
     new Intl.DateTimeFormat(
       "en-IN",
       {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      }
-    ).format(new Date());
+        weekday:
+          "long",
 
-  const greeting = getGreeting();
+        day:
+          "numeric",
+
+        month:
+          "long",
+
+        year:
+          "numeric",
+      }
+    ).format(
+      new Date()
+    );
+
+  const greeting =
+    getGreeting();
+
+  const displayName =
+    user?.displayName ??
+    user?.username ??
+    "Doctor";
 
   return (
     <section className="relative overflow-hidden rounded-[32px] border border-slate-200/70 bg-gradient-to-br from-white via-white to-slate-50 p-8 shadow-sm">
@@ -239,23 +381,36 @@ export default function HeroSection() {
             <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500">
               <CalendarDays className="h-4 w-4" />
 
-              {currentDate}
+              {
+                currentDate
+              }
             </div>
 
             <h1 className="mt-5 text-5xl font-bold tracking-tight text-slate-900">
-              {greeting}, Dr. Pranav 👋
+              {
+                greeting
+              }
+              ,{" "}
+              {
+                displayName
+              }{" "}
+              👋
             </h1>
 
             <h2 className="mt-3 text-xl font-semibold text-blue-600">
-              Shree Mahavir
-              Homoeopathic Clinic
+              {
+                clinicName
+              }
             </h2>
 
             <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-500">
-              Everything is running
-              smoothly today.
+              Everything is
+              running smoothly
+              today.
               <br />
-              Welcome back to your clinic
+
+              Welcome back to
+              your clinic
               dashboard.
             </p>
           </div>
@@ -307,7 +462,9 @@ export default function HeroSection() {
             <AppButton
               variant="secondary"
               onClick={() =>
-                navigate("/visits")
+                navigate(
+                  "/visits"
+                )
               }
               leftIcon={
                 <FileText className="h-5 w-5" />
@@ -326,49 +483,62 @@ export default function HeroSection() {
               <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
 
               <span className="ml-3 text-sm text-slate-500">
-                Loading dashboard...
+                Loading
+                dashboard...
               </span>
             </div>
           ) : loadError ? (
             <div className="col-span-full rounded-2xl border border-red-200 bg-red-50 px-6 py-5 text-sm text-red-700">
-              {loadError}
+              {
+                loadError
+              }
             </div>
           ) : (
-            summary.map((item) => {
-              const Icon = item.icon;
+            summary.map(
+              (item) => {
+                const Icon =
+                  item.icon;
 
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-slate-200 bg-white/80 p-5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
-                        iconColors[
-                          item.color
-                        ] ??
-                        "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      <Icon className="h-5 w-5" />
+                return (
+                  <div
+                    key={
+                      item.title
+                    }
+                    className="rounded-2xl border border-slate-200 bg-white/80 p-5 backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-2xl ${
+                          iconColors[
+                            item
+                              .color
+                          ] ??
+                          "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+
+                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600">
+                        Live
+                      </span>
                     </div>
 
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600">
-                      Live
-                    </span>
+                    <p className="mt-5 text-sm text-slate-500">
+                      {
+                        item.title
+                      }
+                    </p>
+
+                    <h3 className="mt-1 text-3xl font-bold text-slate-900">
+                      {
+                        item.value
+                      }
+                    </h3>
                   </div>
-
-                  <p className="mt-5 text-sm text-slate-500">
-                    {item.title}
-                  </p>
-
-                  <h3 className="mt-1 text-3xl font-bold text-slate-900">
-                    {item.value}
-                  </h3>
-                </div>
-              );
-            })
+                );
+              }
+            )
           )}
         </div>
       </div>
@@ -377,18 +547,28 @@ export default function HeroSection() {
 }
 
 function getLocalDateString() {
-  const date = new Date();
+  const date =
+    new Date();
 
   const year =
     date.getFullYear();
 
-  const month = String(
-    date.getMonth() + 1
-  ).padStart(2, "0");
+  const month =
+    String(
+      date.getMonth() +
+        1
+    ).padStart(
+      2,
+      "0"
+    );
 
-  const day = String(
-    date.getDate()
-  ).padStart(2, "0");
+  const day =
+    String(
+      date.getDate()
+    ).padStart(
+      2,
+      "0"
+    );
 
   return `${year}-${month}-${day}`;
 }
@@ -408,7 +588,9 @@ function getGreeting() {
   return "Good Evening";
 }
 
-function currency(value: number) {
+function currency(
+  value: number
+) {
   return `₹${value.toLocaleString(
     "en-IN"
   )}`;

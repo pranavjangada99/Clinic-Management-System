@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useMemo,
@@ -99,10 +100,10 @@ interface ConsultationForm {
 }
 
 const PATIENTS_API =
-  "http://localhost:5230/api/patients";
+  "/patients";
 
 const VISITS_API =
-  "http://localhost:5230/api/visits";
+  "/visits";
 
 const emptyMedicine = (
   id: number
@@ -208,7 +209,7 @@ export default function Consultation() {
         setLoadError("");
 
         const patientsResponse =
-          await fetch(PATIENTS_API);
+          await apiFetch(PATIENTS_API);
 
         if (!patientsResponse.ok) {
           throw new Error(
@@ -227,7 +228,7 @@ export default function Consultation() {
          */
         if (visitId) {
           const visitResponse =
-            await fetch(
+            await apiFetch(
               `${VISITS_API}/${visitId}`
             );
 
@@ -563,7 +564,7 @@ export default function Consultation() {
          * Existing visit -> PUT
          */
         if (currentVisitId) {
-          response = await fetch(
+          response = await apiFetch(
             `${VISITS_API}/${currentVisitId}`,
             {
               method: "PUT",
@@ -616,7 +617,7 @@ export default function Consultation() {
 
           const now = new Date();
 
-          response = await fetch(
+          response = await apiFetch(
             VISITS_API,
             {
               method: "POST",
@@ -826,7 +827,7 @@ export default function Consultation() {
         setSaveError("");
 
         const response =
-          await fetch(
+          await apiFetch(
             `${VISITS_API}/${savedVisit.id}/complete`,
             {
               method: "PATCH",

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import {
   useNavigate,
@@ -25,7 +26,7 @@ import type {
 } from "./types";
 
 const API_URL =
-  "http://localhost:5230/api/appointments";
+  "/appointments";
 
 const statusStyles: Record<
   AppointmentStatus,
@@ -69,7 +70,7 @@ export default function AppointmentDetails() {
         setIsLoading(true);
         setLoadError("");
 
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/${appointmentId}`
         );
 
@@ -116,7 +117,7 @@ export default function AppointmentDetails() {
       setUpdatingStatus(newStatus);
       setActionError("");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/${appointment.id}/status`,
         {
           method: "PATCH",

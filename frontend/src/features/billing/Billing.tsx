@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -38,7 +39,7 @@ interface ApiBill {
 
 type Filter = "All" | BillStatus;
 
-const API_URL = "http://localhost:5230/api/bills";
+const API_URL = "/bills";
 
 const filters: Filter[] = [
   "All",
@@ -73,7 +74,7 @@ export default function Billing() {
         setIsLoading(true);
         setLoadError("");
 
-        const response = await fetch(API_URL);
+        const response = await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error("Unable to load bills.");

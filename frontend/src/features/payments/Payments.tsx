@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useMemo,
@@ -37,7 +38,7 @@ interface Payment {
 }
 
 const API_URL =
-  "http://localhost:5230/api/payments";
+  "/payments";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -68,7 +69,7 @@ export default function Payments() {
         setLoadError("");
 
         const response =
-          await fetch(API_URL);
+          await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error(

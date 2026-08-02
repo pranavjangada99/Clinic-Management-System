@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useState,
@@ -27,7 +28,7 @@ interface Appointment {
 }
 
 const API_URL =
-  "http://localhost:5230/api/appointments";
+  "/appointments";
 
 const statusColor: Record<
   string,
@@ -67,7 +68,7 @@ export default function ScheduleCard() {
     const loadSchedule = async () => {
       try {
         const response =
-          await fetch(API_URL);
+          await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error(

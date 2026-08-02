@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useState,
@@ -36,10 +37,20 @@ interface Payment {
 
   paymentDate: string;
   createdAt: string;
+  receiptNumber: string;
+}
+
+interface ClinicSettings {
+  clinicName: string;
+  doctorName: string;
+  receiptFooter: string;
 }
 
 const API_URL =
-  "http://localhost:5230/api/payments";
+  "/payments";
+
+const SETTINGS_API_URL =
+  "/clinic-settings";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -51,6 +62,9 @@ export default function Receipt() {
 
   const [payment, setPayment] =
     useState<Payment | null>(null);
+
+  const [clinic, setClinic] =
+    useState<ClinicSettings | null>(null);
 
   const [isLoading, setIsLoading] =
     useState(true);
@@ -78,10 +92,11 @@ export default function Receipt() {
         setIsLoading(true);
         setLoadError("");
 
-        const response =
-          await fetch(
-            `${API_URL}/${paymentId}`
-          );
+        const [response, settingsResponse] =
+          await Promise.all([
+            apiFetch(`${API_URL}/${paymentId}`),
+            apiFetch(SETTINGS_API_URL),
+          ]);
 
         if (!response.ok) {
           if (
@@ -101,6 +116,13 @@ export default function Receipt() {
           await response.json();
 
         setPayment(data);
+
+        if (settingsResponse.ok) {
+          const settingsData: ClinicSettings =
+            await settingsResponse.json();
+
+          setClinic(settingsData);
+        }
       } catch (error) {
         console.error(
           "Failed to load payment:",
@@ -171,9 +193,12 @@ export default function Receipt() {
   }
 
   const receiptNumber =
-    `PAY-${String(
-      payment.id
-    ).padStart(4, "0")}`;
+    payment.receiptNumber ||
+    `PAY-${String(payment.id).padStart(4, "0")}`;
+
+  const clinicName =
+    clinic?.clinicName ||
+    "Clinic";
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -229,7 +254,7 @@ export default function Receipt() {
 
               <div>
                 <h1 className="text-xl font-bold text-slate-900">
-                  Shree Mahavir Homoeopathic Clinic
+                  {clinicName}
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
@@ -336,6 +361,12 @@ export default function Receipt() {
           </section>
         )}
 
+        {clinic?.receiptFooter && (
+          <section className="border-t border-slate-200 py-5 text-sm text-slate-500">
+            {clinic.receiptFooter}
+          </section>
+        )}
+
         {/* Footer */}
 
         <footer className="mt-16 flex justify-end">
@@ -345,7 +376,7 @@ export default function Receipt() {
             </p>
 
             <p className="mt-1 text-xs text-slate-500">
-              Shree Mahavir Homoeopathic Clinic
+              {clinicName}
             </p>
           </div>
         </footer>

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useState,
@@ -46,13 +47,13 @@ interface ActivityItem {
 }
 
 const PAYMENTS_API =
-  "http://localhost:5230/api/payments";
+  "/payments";
 
 const VISITS_API =
-  "http://localhost:5230/api/visits";
+  "/visits";
 
 const APPOINTMENTS_API =
-  "http://localhost:5230/api/appointments";
+  "/appointments";
 
 export default function ActivityFeed() {
   const [activities, setActivities] =
@@ -74,9 +75,9 @@ export default function ActivityFeed() {
           visitsResponse,
           appointmentsResponse,
         ] = await Promise.all([
-          fetch(PAYMENTS_API),
-          fetch(VISITS_API),
-          fetch(APPOINTMENTS_API),
+          apiFetch(PAYMENTS_API),
+          apiFetch(VISITS_API),
+          apiFetch(APPOINTMENTS_API),
         ]);
 
         if (

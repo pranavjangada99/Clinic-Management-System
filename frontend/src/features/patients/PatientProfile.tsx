@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -61,10 +62,10 @@ interface PatientVisit {
 }
 
 const PATIENTS_API_URL =
-  "http://localhost:5230/api/patients";
+  "/patients";
 
 const VISITS_API_URL =
-  "http://localhost:5230/api/visits";
+  "/visits";
 
 const statusStyles: Record<string, string> = {
   Active: "bg-emerald-50 text-emerald-700",
@@ -113,7 +114,7 @@ export default function PatientProfile() {
         setLoadError("");
         setNotFound(false);
 
-        const response = await fetch(
+        const response = await apiFetch(
           `${PATIENTS_API_URL}/${patientId}`
         );
 
@@ -164,7 +165,7 @@ export default function PatientProfile() {
         setVisitsError("");
 
         const response =
-          await fetch(VISITS_API_URL);
+          await apiFetch(VISITS_API_URL);
 
         if (!response.ok) {
           throw new Error(

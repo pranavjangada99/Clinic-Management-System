@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -41,7 +42,7 @@ interface Visit {
 
 type Filter = "All" | VisitStatus;
 
-const API_URL = "http://localhost:5230/api/visits";
+const API_URL = "/visits";
 
 const filters: Filter[] = ["All", "Waiting", "In Progress", "Completed"];
 
@@ -69,7 +70,7 @@ export default function Visits() {
 
     const loadVisits = async () => {
       try {
-        const response = await fetch(API_URL);
+        const response = await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error("Unable to load visits.");

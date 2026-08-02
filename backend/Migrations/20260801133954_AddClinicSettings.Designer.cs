@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using backend.Data;
 
@@ -10,58 +11,14 @@ using backend.Data;
 namespace backend.Migrations
 {
     [DbContext(typeof(ClinicDbContext))]
-    partial class ClinicDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260801133954_AddClinicSettings")]
+    partial class AddClinicSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
-
-            modelBuilder.Entity("backend.Models.AppUser", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime?>("LastLoginAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Username")
-                        .IsUnique();
-
-                    b.ToTable("AppUsers");
-                });
 
             modelBuilder.Entity("backend.Models.Appointment", b =>
                 {
@@ -204,15 +161,6 @@ namespace backend.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("AllowPartialPayments")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("AllowSameDayAppointments")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("AppointmentDurationMinutes")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("City")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
@@ -233,22 +181,6 @@ namespace backend.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("DefaultConsultationFee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("DefaultFollowUpDays")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("DefaultFollowUpFee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("DoctorEmail")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
@@ -262,60 +194,17 @@ namespace backend.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
-                    b.Property<bool>("EnableAppointmentReminders")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("InvoiceFooter")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("InvoicePrefix")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("NextInvoiceNumber")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("NextPatientNumber")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("NextReceiptNumber")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("PatientUhidPrefix")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("PinCode")
                         .HasMaxLength(10)
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("PrintReceiptAfterPayment")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Qualification")
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ReceiptFooter")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ReceiptPrefix")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("ShowOutstandingBalance")
-                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Specialisation")
                         .HasMaxLength(150)
@@ -447,11 +336,6 @@ namespace backend.Migrations
                     b.Property<DateTime>("PaymentDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ReceiptNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Reference")
                         .HasMaxLength(150)
                         .HasColumnType("TEXT");
@@ -459,9 +343,6 @@ namespace backend.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BillId");
-
-                    b.HasIndex("ReceiptNumber")
-                        .IsUnique();
 
                     b.ToTable("Payments");
                 });

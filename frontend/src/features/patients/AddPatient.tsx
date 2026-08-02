@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -44,7 +45,7 @@ const initialForm: PatientForm = {
   referredBy: "",
 };
 
-const API_URL = "http://localhost:5230/api/patients";
+const API_URL = "/patients";
 
 export default function AddPatient() {
   const navigate = useNavigate();
@@ -174,7 +175,7 @@ export default function AddPatient() {
     setSaveError("");
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await apiFetch(API_URL, {
         method: "POST",
 
         headers: {

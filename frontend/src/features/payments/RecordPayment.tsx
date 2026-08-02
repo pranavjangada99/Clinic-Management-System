@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useMemo,
@@ -43,10 +44,10 @@ interface Bill {
 }
 
 const BILLS_API =
-  "http://localhost:5230/api/bills";
+  "/bills";
 
 const PAYMENTS_API =
-  "http://localhost:5230/api/payments";
+  "/payments";
 
 const currency = (value: number) =>
   `₹${value.toLocaleString("en-IN")}`;
@@ -102,7 +103,7 @@ export default function RecordPayment() {
         setError("");
 
         const response =
-          await fetch(BILLS_API);
+          await apiFetch(BILLS_API);
 
         if (!response.ok) {
           throw new Error(
@@ -238,7 +239,7 @@ export default function RecordPayment() {
         setError("");
 
         const response =
-          await fetch(
+          await apiFetch(
             PAYMENTS_API,
             {
               method: "POST",

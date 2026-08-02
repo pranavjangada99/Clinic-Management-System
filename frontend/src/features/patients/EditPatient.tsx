@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -46,7 +47,7 @@ interface PatientForm {
   status: string;
 }
 
-const API_URL = "http://localhost:5230/api/patients";
+const API_URL = "/patients";
 
 const emptyForm: PatientForm = {
   fullName: "",
@@ -90,7 +91,7 @@ export default function EditPatient() {
         setIsLoading(true);
         setLoadError("");
 
-        const response = await fetch(
+        const response = await apiFetch(
           `${API_URL}/${patientId}`
         );
 
@@ -246,7 +247,7 @@ export default function EditPatient() {
       setIsSaving(true);
       setSaveError("");
 
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/${patient.id}`,
         {
           method: "PUT",

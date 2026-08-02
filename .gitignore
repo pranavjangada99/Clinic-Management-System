@@ -2,7 +2,28 @@
 backend/clinic.db
 backend/clinic.db-shm
 backend/clinic.db-wal
+clinic.db
+clinic.db-shm
+clinic.db-wal
+
+# Database backups
+backend/Backups/
+Backups/
 
 # Backend build files
 backend/bin/
 backend/obj/
+
+# Frontend dependencies/build output
+frontend/node_modules/
+frontend/dist/
+
+# Environment/local files
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vs/
+.DS_Store
+Thumbs.db

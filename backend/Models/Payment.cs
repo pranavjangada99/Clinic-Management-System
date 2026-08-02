@@ -28,4 +28,8 @@ public class Payment
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Bill Bill { get; set; } = null!;
+
+    [Required]
+    [MaxLength(100)]
+    public string ReceiptNumber { get; set; } = string.Empty;
 }

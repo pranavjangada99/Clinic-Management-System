@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -26,7 +27,7 @@ interface Patient {
 
 type Filter = "All" | PatientStatus;
 
-const API_URL = "http://localhost:5230/api/patients";
+const API_URL = "/patients";
 
 const filters: Filter[] = [
   "All",
@@ -57,7 +58,7 @@ export default function Patients() {
         setIsLoading(true);
         setLoadError("");
 
-        const response = await fetch(API_URL);
+        const response = await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error("Unable to load patients.");

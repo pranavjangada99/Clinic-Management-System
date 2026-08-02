@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -54,7 +55,7 @@ interface Visit {
   updatedAt: string;
 }
 
-const API_URL = "http://localhost:5230/api/visits";
+const API_URL = "/visits";
 
 export default function VisitDetails() {
   const navigate = useNavigate();
@@ -73,7 +74,7 @@ export default function VisitDetails() {
 
     const loadVisit = async () => {
       try {
-        const response = await fetch(`${API_URL}/${visitId}`);
+        const response = await apiFetch(`${API_URL}/${visitId}`);
 
         if (!response.ok) {
           if (response.status === 404) {

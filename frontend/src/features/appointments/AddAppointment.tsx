@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -45,9 +46,11 @@ interface CreatedAppointment {
   status: string;
 }
 
-const PATIENTS_API_URL = "http://localhost:5230/api/patients";
+const PATIENTS_API_URL = "/patients";
 
-const APPOINTMENTS_API_URL = "http://localhost:5230/api/appointments";
+const APPOINTMENTS_API_URL = "/appointments";
+
+const SETTINGS_API_URL = "/clinic-settings";
 
 export default function AddAppointment() {
   const navigate = useNavigate();
@@ -72,7 +75,7 @@ export default function AddAppointment() {
     date: today,
     time: "",
     type: "New Consultation",
-    doctor: "Dr. Pranav",
+    doctor: "",
     reason: "",
     status: "Scheduled",
   });
@@ -89,15 +92,30 @@ export default function AddAppointment() {
         setIsLoadingPatients(true);
         setPatientLoadError("");
 
-        const response = await fetch(PATIENTS_API_URL);
+        const [patientsResponse, settingsResponse] = await Promise.all([
+          apiFetch(PATIENTS_API_URL),
+          apiFetch(SETTINGS_API_URL),
+        ]);
 
-        if (!response.ok) {
+        if (!patientsResponse.ok) {
           throw new Error("Unable to load patients.");
         }
 
-        const data: Patient[] = await response.json();
+        const data: Patient[] = await patientsResponse.json();
 
         setPatients(data);
+
+        if (settingsResponse.ok) {
+          const settings: { doctorName?: string } =
+            await settingsResponse.json();
+
+          if (settings.doctorName?.trim()) {
+            setForm((current) => ({
+              ...current,
+              doctor: settings.doctorName!.trim(),
+            }));
+          }
+        }
 
         if (requestedPatientId) {
           const patientExists = data.some(
@@ -197,7 +215,7 @@ export default function AddAppointment() {
       setIsSaving(true);
       setSaveError("");
 
-      const response = await fetch(APPOINTMENTS_API_URL, {
+      const response = await apiFetch(APPOINTMENTS_API_URL, {
         method: "POST",
 
         headers: {
@@ -463,7 +481,13 @@ export default function AddAppointment() {
               onChange={(event) => updateField("doctor", event.target.value)}
               className={inputClass}
             >
-              <option value="Dr. Pranav">Dr. Pranav</option>
+              {form.doctor ? (
+                <option value={form.doctor}>{form.doctor}</option>
+              ) : (
+                <option value="" disabled>
+                  Doctor not configured
+                </option>
+              )}
             </select>
           </div>
 

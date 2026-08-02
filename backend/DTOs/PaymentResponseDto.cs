@@ -25,4 +25,6 @@ public class PaymentResponseDto
     public DateTime PaymentDate { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public string ReceiptNumber { get; set; } = string.Empty;
 }

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/lib/api";
 import {
   useEffect,
   useState,
@@ -25,7 +26,7 @@ interface WaitingVisit {
 }
 
 const API_URL =
-  "http://localhost:5230/api/visits";
+  "/visits";
 
 export default function WaitingQueue() {
   const [waitingVisits, setWaitingVisits] =
@@ -43,7 +44,7 @@ export default function WaitingQueue() {
     const loadWaitingQueue = async () => {
       try {
         const response =
-          await fetch(API_URL);
+          await apiFetch(API_URL);
 
         if (!response.ok) {
           throw new Error(
